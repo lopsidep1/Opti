@@ -1,4 +1,5 @@
--- Servicios
+if not game:IsLoaded() then game.Loaded:Wait() end
+
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
@@ -8,7 +9,20 @@ local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
-repeat task.wait() until player and player:FindFirstChild("PlayerGui")
+local guiMain = Instance.new("ScreenGui")
+guiMain.Name = "TurboPanel"
+guiMain.ResetOnSpawn = false
+guiMain.IgnoreGuiInset = false
+guiMain.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromOffset(460, 500)
+frame.Position = UDim2.fromOffset(20, 60)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Parent = guiMain
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 
 local function notify(title, text, dur)
     pcall(function()
@@ -16,19 +30,14 @@ local function notify(title, text, dur)
     end)
 end
 
--- Estado inicial
-local baseline = {
-    Lighting = {}, Sound = {}, Terrain = {}, Streaming = {},
-    Guis = {}, Props = {}
-}
+local baseline = {Lighting = {}, Sound = {}, Terrain = {}, Streaming = {}, Guis = {}, Props = {}}
 local function ensureSaved(obj, props)
     if not obj then return end
     baseline.Props[obj] = baseline.Props[obj] or {}
-    local saved = baseline.Props[obj]
     for _, p in ipairs(props) do
-        if saved[p] == nil then
+        if baseline.Props[obj][p] == nil then
             local ok, val = pcall(function() return obj[p] end)
-            if ok then saved[p] = val end
+            if ok then baseline.Props[obj][p] = val end
         end
     end
 end
@@ -54,12 +63,6 @@ local function snapshotAll()
         DopplerScale = SoundService.DopplerScale,
         RespectFilteringEnabled = SoundService.RespectFilteringEnabled
     }
-    local okE, enabled = pcall(function() return Workspace.StreamingEnabled end)
-    if okE then baseline.Streaming.Enabled = enabled end
-    local okM, minR = pcall(function() return Workspace.StreamingMinRadius end)
-    if okM then baseline.Streaming.Min = minR end
-    local okT, tgtR = pcall(function() return Workspace.StreamingTargetRadius end)
-    if okT then baseline.Streaming.Target = tgtR end
     local t = Workspace:FindFirstChildOfClass("Terrain")
     if t then
         baseline.Terrain = {
@@ -75,143 +78,12 @@ local function snapshotAll()
         end
     end
 end
-
--- Variables de estado
-local guiMain, frame, statusLabel, fpsLabel, memLabel, blackFrame
-local dragEnabled, autoMode = true, false
-local currentProfile = "Medio"
-local avgDt = 1/60
-local avgFps = 60
-local lastAutoClean = tick()
-local autoCleanInterval = 180
-local ultraHideGUIs = false
-local streamerMode = false
-local autoRestore = true
-
--- Funciones de optimización
-local function applyProfile(name)
-    currentProfile = name
-    local L = Lighting
-    if name == "Bajo" then
-        L.GlobalShadows = false
-        L.FogEnd = 1e6
-        L.EnvironmentDiffuseScale = 0.1
-        L.EnvironmentSpecularScale = 0.1
-        L.Brightness = 1
-    elseif name == "Medio" then
-        L.GlobalShadows = false
-        L.FogEnd = 1e8
-        L.EnvironmentDiffuseScale = 0
-        L.EnvironmentSpecularScale = 0
-        L.Brightness = 0.75
-    elseif name == "Alto" then
-        L.GlobalShadows = false
-        L.FogEnd = 1e9
-        L.EnvironmentDiffuseScale = 0
-        L.EnvironmentSpecularScale = 0
-        L.Ambient = Color3.new(0.1, 0.1, 0.1)
-        L.OutdoorAmbient = Color3.new(0.1, 0.1, 0.1)
-        L.Brightness = 0.5
-    end
-    statusLabel.Text = ("Estado: Activo (%s%s)"):format(name, autoMode and " - Auto" or "")
-end
-
-local function restoreAll()
-    for k, v in pairs(baseline.Lighting) do Lighting[k] = v end
-    for k, v in pairs(baseline.Sound) do SoundService[k] = v end
-    if baseline.Streaming.Enabled ~= nil then pcall(function() Workspace.StreamingEnabled = baseline.Streaming.Enabled end) end
-    if baseline.Streaming.Min ~= nil then pcall(function() Workspace.StreamingMinRadius = baseline.Streaming.Min end) end
-    if baseline.Streaming.Target ~= nil then pcall(function() Workspace.StreamingTargetRadius = baseline.Streaming.Target end) end
-    local t = Workspace:FindFirstChildOfClass("Terrain")
-    if t then for k, v in pairs(baseline.Terrain) do t[k] = v end end
-    for g, state in pairs(baseline.Guis) do if g then g.Enabled = state end end
-    for obj, props in pairs(baseline.Props) do
-        if obj then
-            for propName, originalValue in pairs(props) do
-                pcall(function() obj[propName] = originalValue end)
-            end
-        end
-    end
-    if blackFrame then blackFrame.Visible = false end
-    statusLabel.Text = "Estado: Restaurado"
-end
-
-local function muteAll()
-    for _, s in ipairs(Workspace:GetDescendants()) do
-        if s:IsA("Sound") then
-            ensureSaved(s, {"Volume", "Playing"})
-            s.Volume = 0
-            s.Playing = false
-        end
-    end
-end
-
-local function optimizeLights()
-    for _, l in ipairs(Workspace:GetDescendants()) do
-        if l:IsA("Light") then
-            ensureSaved(l, {"Enabled", "Brightness", "Range"})
-            l.Enabled = false
-            l.Brightness = 0
-            l.Range = 0
-        end
-    end
-end
-
-local function clearParticles()
-    for _, p in ipairs(Workspace:GetDescendants()) do
-        if p:IsA("ParticleEmitter") or p:IsA("Trail") or p:IsA("Beam") or p:IsA("Smoke") or p:IsA("Sparkles") or p:IsA("Fire") then
-            ensureSaved(p, {"Enabled"})
-            p.Enabled = false
-        end
-    end
-end
-
-local function hideDecorGUIs()
-    for g, _ in pairs(baseline.Guis) do
-        if g then
-            ensureSaved(g, {"Enabled"})
-            g.Enabled = false
-        end
-    end
-end
-
-local function optimizeMaterials()
-    for _, part in ipairs(Workspace:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if part.Material == Enum.Material.Neon or part.Material == Enum.Material.Glass then
-                ensureSaved(part, {"Material"})
-                part.Material = Enum.Material.SmoothPlastic
-            end
-        end
-        if part:IsA("MeshPart") then
-            ensureSaved(part, {"RenderFidelity"})
-            pcall(function() part.RenderFidelity = Enum.RenderFidelity.Performance end)
-        end
-    end
-end
-
-local function hasHumanoidAncestor(inst)
-    local a = inst
-    while a do
-        if a:IsA("Model") and a:FindFirstChildOfClass("Humanoid") then return true end
-        a = a.Parent
-    end
-    return false
-end
-
 local function optimizePhysicsUltraSafe()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     for _, part in ipairs(Workspace:GetDescendants()) do
-        if part:IsA("BasePart") and not hasHumanoidAncestor(part) then
-            local keepCollision = false
-            if part.Name:lower() == "baseplate" then
-                keepCollision = true
-            end
-            if root and (part.Position.Y < root.Position.Y) and ((root.Position - part.Position).Magnitude < 20) then
-                keepCollision = true
-            end
-            if not keepCollision and part.AssemblyLinearVelocity.Magnitude < 0.01 then
+        if part:IsA("BasePart") and not part:FindFirstAncestorOfClass("Model") then
+            if not part.Anchored and part.AssemblyLinearVelocity.Magnitude < 0.01 then
                 ensureSaved(part, {"Anchored", "CanCollide"})
                 part.Anchored = true
                 part.CanCollide = false
@@ -259,7 +131,158 @@ local function ultraRendimiento()
     statusLabel.Text = "Estado: Ultra+ activado"
     notify("Modo Turbo", "Ultra+ activado", 4)
 end
+-- Título
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -90, 0, 28)
+title.Position = UDim2.fromOffset(12, 8)
+title.BackgroundTransparency = 1
+title.Text = "Modo Turbo Optimizer PRO"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextSize = 20
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frame
 
+-- Indicadores
+statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -10, 0, 24)
+statusLabel.Position = UDim2.fromOffset(5, 36)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Estado: Inactivo"
+statusLabel.TextScaled = true
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+statusLabel.Parent = frame
+
+fpsLabel = Instance.new("TextLabel")
+fpsLabel.Size = UDim2.new(1, -10, 0, 24)
+fpsLabel.Position = UDim2.fromOffset(5, 60)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.Text = "FPS: ..."
+fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+fpsLabel.TextScaled = true
+fpsLabel.Font = Enum.Font.Gotham
+fpsLabel.Parent = frame
+
+memLabel = Instance.new("TextLabel")
+memLabel.Size = UDim2.new(1, -10, 0, 24)
+memLabel.Position = UDim2.fromOffset(5, 84)
+memLabel.BackgroundTransparency = 1
+memLabel.Text = "Mem (Lua): ..."
+memLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+memLabel.TextScaled = true
+memLabel.Font = Enum.Font.Gotham
+memLabel.Parent = frame
+
+-- Diagnóstico avanzado
+local statsLabel = Instance.new("TextLabel")
+statsLabel.Size = UDim2.new(1,-10,0,22)
+statsLabel.Position = UDim2.fromOffset(5, 108)
+statsLabel.BackgroundTransparency = 1
+statsLabel.Text = "Ping: ... | Partes: ... | Luz: ... | Partículas: ..."
+statsLabel.TextColor3 = Color3.fromRGB(170,170,220)
+statsLabel.TextScaled = true
+statsLabel.Font = Enum.Font.Gotham
+statsLabel.Parent = frame
+
+-- Sistema de pestañas
+local pestañas = {
+    ["🧩 Perfiles"] = {
+        {Text = "Bajo", Callback = function() applyProfile("Bajo") end},
+        {Text = "Medio", Callback = function() applyProfile("Medio") end},
+        {Text = "Alto", Callback = function() applyProfile("Alto") end},
+        {Text = "Auto: OFF", Callback = function(btn)
+            autoMode = not autoMode
+            btn.Text = "Auto: " .. (autoMode and "ON" or "OFF")
+        end}
+    },
+    ["⚙️ Acciones"] = {
+        {Text = "Silenciar todo", Callback = muteAll},
+        {Text = "Apagar luces", Callback = optimizeLights},
+        {Text = "Apagar partículas", Callback = clearParticles},
+        {Text = "Ocultar GUIs decorativas", Callback = hideDecorGUIs},
+        {Text = "Optimizar materiales", Callback = optimizeMaterials},
+        {Text = "Optimizar físicas", Callback = optimizePhysicsUltraSafe}
+    },
+    ["🚀 Ultra+"] = {
+        {Text = "Activar Ultra+", Callback = ultraRendimiento}
+    },
+    ["🔄 Restaurar"] = {
+        {Text = "Restaurar todo", Callback = restoreAll},
+        {Text = "Pantalla negra", Callback = toggleBlack}
+    }
+}
+
+local tabFrames = {}
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1, -20, 0, 36)
+tabBar.Position = UDim2.fromOffset(10, 140)
+tabBar.BackgroundTransparency = 1
+tabBar.Parent = frame
+
+local tabScroll = Instance.new("ScrollingFrame")
+tabScroll.Size = UDim2.new(1, 0, 1, 0)
+tabScroll.CanvasSize = UDim2.new(0, 0, 1, 0)
+tabScroll.ScrollingDirection = Enum.ScrollingDirection.X
+tabScroll.ScrollBarThickness = 4
+tabScroll.BackgroundTransparency = 1
+tabScroll.Parent = tabBar
+
+local tabList = Instance.new("UIListLayout")
+tabList.FillDirection = Enum.FillDirection.Horizontal
+tabList.Padding = UDim.new(0, 6)
+tabList.SortOrder = Enum.SortOrder.LayoutOrder
+tabList.Parent = tabScroll
+
+local function showTab(name)
+    for tabName, tabFrame in pairs(tabFrames) do
+        tabFrame.Visible = (tabName == name)
+    end
+end
+
+for tabName, actions in pairs(pestañas) do
+    local tabBtn = Instance.new("TextButton")
+    tabBtn.Size = UDim2.new(0, 140, 1, -6)
+    tabBtn.Text = tabName
+    tabBtn.Font = Enum.Font.GothamBold
+    tabBtn.TextScaled = true
+    tabBtn.TextColor3 = Color3.new(1,1,1)
+    tabBtn.BackgroundColor3 = Color3.fromRGB(40,40,60)
+    tabBtn.Parent = tabScroll
+    Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0,6)
+    tabBtn.MouseButton1Click:Connect(function() showTab(tabName) end)
+
+    local tabFrame = Instance.new("Frame")
+    tabFrame.Size = UDim2.new(1, -20, 0, 240)
+    tabFrame.Position = UDim2.fromOffset(10, 190)
+    tabFrame.BackgroundTransparency = 1
+    tabFrame.Visible = false
+    tabFrame.Parent = frame
+    tabFrames[tabName] = tabFrame
+
+    for i, action in ipairs(actions) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 32)
+        btn.Position = UDim2.fromOffset(0, (i - 1) * 36)
+        btn.Text = action.Text
+        btn.Font = Enum.Font.Gotham
+        btn.TextScaled = true
+        btn.TextColor3 = Color3.new(1,1,1)
+        btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+        btn.Parent = tabFrame
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+        btn.MouseButton1Click:Connect(function()
+            local ok, err = pcall(function() action.Callback(btn) end)
+            if not ok then
+                warn("[Modo Turbo] Error en botón:", err)
+                notify("Modo Turbo", "Error en " .. action.Text, 3)
+            end
+        end)
+    end
+end
+
+tabScroll.CanvasSize = UDim2.new(0, tabList.AbsoluteContentSize.X, 1, 0)
+showTab("🧩 Perfiles")
 -- Diagnóstico en tiempo real
 RunService.RenderStepped:Connect(function(dt)
     avgDt = avgDt + (dt - avgDt) * 0.15
@@ -334,7 +357,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- Snapshot inicial
+-- Snapshot inicial y mensaje de carga
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil o usa Auto"
 notify("Modo Turbo", "Panel PRO listo (F1 oculta/muestra)", 4)
