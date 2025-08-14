@@ -1,5 +1,4 @@
--- Turbo Optimizer Panel v2.0 - Tabs: Perfiles, Acciones, Ultra+, Restaurar
--- Servicios
+-- Turbo Optimizer Panel Plus - GUI avanzado, tamaño variable, scroll en pestañas, FPS/memoria, botón X para cerrar
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
@@ -9,13 +8,13 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 local baseline = {Lighting = {}, Sound = {}, Guis = {}, Props = {}}
-local guiMain, frame, statusLabel, blackFrame, openBtn
+local guiMain, frame, statusLabel, blackFrame, openBtn, closeBtn, memLabel, fpsLabel
 local dragEnabled = true
 local avgDt, avgFps = 1/60, 60
 local currentProfile = "Medio"
 local autoMode = false
 
--- Estado original
+-- Guardar estado original
 local function ensureSaved(obj, props)
     if not obj then return end
     baseline.Props[obj] = baseline.Props[obj] or {}
@@ -71,7 +70,6 @@ local function restoreAll()
     statusLabel.Text = "Estado: Restaurado"
 end
 
--- Perfiles
 local function applyProfile(name)
     currentProfile = name
     local L = Lighting
@@ -99,10 +97,8 @@ local function applyProfile(name)
     statusLabel.Text = ("Estado: Perfil %s%s"):format(name, autoMode and " (Auto)" or "")
 end
 
--- Ultra+
 local function ultraRendimiento()
     applyProfile("Alto")
-    -- Silenciar sonidos
     for _, s in ipairs(Workspace:GetDescendants()) do
         if s:IsA("Sound") then
             ensureSaved(s, {"Volume", "Playing"})
@@ -110,7 +106,6 @@ local function ultraRendimiento()
             s.Playing = false
         end
     end
-    -- Optimizar luces
     for _, l in ipairs(Workspace:GetDescendants()) do
         if l:IsA("Light") then
             ensureSaved(l, {"Enabled", "Brightness", "Range"})
@@ -119,14 +114,12 @@ local function ultraRendimiento()
             l.Range = 0
         end
     end
-    -- Limpiar partículas
     for _, p in ipairs(Workspace:GetDescendants()) do
         if p:IsA("ParticleEmitter") or p:IsA("Trail") or p:IsA("Beam") or p:IsA("Smoke") or p:IsA("Sparkles") or p:IsA("Fire") then
             ensureSaved(p, {"Enabled"})
             p.Enabled = false
         end
     end
-    -- Optimizar materiales
     for _, part in ipairs(Workspace:GetDescendants()) do
         if part:IsA("BasePart") then
             if part.Material == Enum.Material.Neon or part.Material == Enum.Material.Glass then
@@ -142,7 +135,6 @@ local function ultraRendimiento()
     statusLabel.Text = "Estado: Ultra+ activado"
 end
 
--- Acciones
 local function muteAll()
     for _, s in ipairs(Workspace:GetDescendants()) do
         if s:IsA("Sound") then
@@ -207,7 +199,6 @@ local function optimizePhysics()
     end
 end
 
--- Pantalla negra
 local function toggleBlack()
     if not blackFrame then
         blackFrame = Instance.new("Frame")
@@ -227,40 +218,45 @@ guiMain.ResetOnSpawn = false
 guiMain.IgnoreGuiInset = false
 guiMain.Parent = player:WaitForChild("PlayerGui")
 
-local FRAME_WIDTH = 480
-local FRAME_HEIGHT = 340
+local FRAME_WIDTH = 500
+local MIN_HEIGHT = 220
+local MAX_HEIGHT = 480
 
 frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(FRAME_WIDTH, FRAME_HEIGHT)
+frame.Size = UDim2.fromOffset(FRAME_WIDTH, MIN_HEIGHT)
 frame.Position = UDim2.fromOffset(40, 60)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Parent = guiMain
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 32)
-title.Position = UDim2.fromOffset(0, 0)
+title.Size = UDim2.new(1, -40, 0, 32)
+title.Position = UDim2.fromOffset(20, 0)
 title.BackgroundTransparency = 1
-title.Text = "Turbo Optimizer Panel"
+title.Text = "Turbo Optimizer Panel Plus"
 title.TextColor3 = Color3.new(1, 1, 1)
-title.TextSize = 20
+title.TextSize = 22
 title.Font = Enum.Font.GothamBold
-title.TextXAlignment = Enum.TextXAlignment.Center
+title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = frame
 
-statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -10, 0, 24)
-statusLabel.Position = UDim2.fromOffset(5, 36)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Estado: Inactivo"
-statusLabel.TextScaled = true
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-statusLabel.Parent = frame
+closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.fromOffset(32, 32)
+closeBtn.Position = UDim2.fromOffset(FRAME_WIDTH - 40, 4)
+closeBtn.BackgroundColor3 = Color3.fromRGB(80,30,30)
+closeBtn.Text = "❌"
+closeBtn.TextScaled = true
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.Parent = frame
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(1,0)
+closeBtn.MouseButton1Click:Connect(function()
+    frame.Visible = false
+    openBtn.Visible = true
+end)
 
--- Botón abrir/cerrar panel
 openBtn = Instance.new("TextButton")
 openBtn.Size = UDim2.fromOffset(36, 36)
 openBtn.Position = UDim2.fromOffset(10, 10)
@@ -275,21 +271,6 @@ Instance.new("UICorner", openBtn).CornerRadius = UDim.new(1,0)
 openBtn.MouseButton1Click:Connect(function()
     frame.Visible = true
     openBtn.Visible = false
-end)
-
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.fromOffset(32, 32)
-closeBtn.Position = UDim2.fromOffset(FRAME_WIDTH - 36, 4)
-closeBtn.BackgroundColor3 = Color3.fromRGB(80,30,30)
-closeBtn.Text = "✕"
-closeBtn.TextScaled = true
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextColor3 = Color3.new(1,1,1)
-closeBtn.Parent = frame
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(1,0)
-closeBtn.MouseButton1Click:Connect(function()
-    frame.Visible = false
-    openBtn.Visible = true
 end)
 
 -- Arrastre libre del panel
@@ -343,7 +324,38 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Tabs y botones - Fila superior
+statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -10, 0, 22)
+statusLabel.Position = UDim2.fromOffset(8, 36)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Estado: Inactivo"
+statusLabel.TextScaled = true
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+statusLabel.Parent = frame
+
+-- FPS y memoria
+fpsLabel = Instance.new("TextLabel")
+fpsLabel.Size = UDim2.new(0, 90, 0, 18)
+fpsLabel.Position = UDim2.fromOffset(8, 62)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.Text = "FPS: ..."
+fpsLabel.TextScaled = true
+fpsLabel.Font = Enum.Font.Code
+fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+fpsLabel.Parent = frame
+
+memLabel = Instance.new("TextLabel")
+memLabel.Size = UDim2.new(0, 110, 0, 18)
+memLabel.Position = UDim2.fromOffset(104, 62)
+memLabel.BackgroundTransparency = 1
+memLabel.Text = "Mem: ..."
+memLabel.TextScaled = true
+memLabel.Font = Enum.Font.Code
+memLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
+memLabel.Parent = frame
+
+-- Tabs y botones - Scroll horizontal
 local tabs = {
     ["🔄 Restaurar"] = {
         {Text = "Restaurar todo", Callback = restoreAll},
@@ -371,18 +383,25 @@ local tabs = {
     }
 }
 
-local tabButtons, tabFrames = {}, {}
-local tabY = 72
+local tabButtons, tabFrames, tabHeights = {}, {}, {}
+local tabY = 88
 local tabHeight = 36
 local tabSpacing = 8
 local contentY = tabY + tabHeight + 10
-local buttonHeight = 36
+local buttonHeight = 38
+local minHeight = MIN_HEIGHT
+local maxHeight = MAX_HEIGHT
 
-local tabsBar = Instance.new("Frame")
-tabsBar.Size = UDim2.new(1, -20, 0, tabHeight + 8)
+local tabsBar = Instance.new("ScrollingFrame")
+tabsBar.Size = UDim2.new(1, -20, 0, tabHeight)
 tabsBar.Position = UDim2.fromOffset(10, tabY)
-tabsBar.BackgroundTransparency = 1
+tabsBar.BackgroundColor3 = Color3.fromRGB(20,20,30)
 tabsBar.Parent = frame
+tabsBar.ScrollBarThickness = 6
+tabsBar.ScrollingDirection = Enum.ScrollingDirection.X
+tabsBar.BorderSizePixel = 0
+tabsBar.ZIndex = 10
+tabsBar.CanvasSize = UDim2.new(0, 0, 1, 0)
 tabsBar.ClipsDescendants = true
 
 local tabsList = Instance.new("UIListLayout")
@@ -393,14 +412,14 @@ tabsList.Parent = tabsBar
 
 for tabName, actions in pairs(tabs) do
     local tabBtn = Instance.new("TextButton")
-    tabBtn.Size = UDim2.new(0, 120, 1, -8)
+    tabBtn.Size = UDim2.new(0, 126, 1, -8)
     tabBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
     tabBtn.Text = tabName
     tabBtn.TextColor3 = Color3.new(1, 1, 1)
     tabBtn.TextScaled = true
     tabBtn.Font = Enum.Font.Gotham
     tabBtn.Parent = tabsBar
-    Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 10)
     table.insert(tabButtons, tabBtn)
 
     local tabFrame = Instance.new("Frame")
@@ -411,6 +430,7 @@ for tabName, actions in pairs(tabs) do
     tabFrame.Parent = frame
     tabFrames[tabName] = tabFrame
 
+    local totalBtnHeight = 0
     for i, action in ipairs(actions) do
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, 0, 0, buttonHeight)
@@ -421,20 +441,27 @@ for tabName, actions in pairs(tabs) do
         btn.TextScaled = true
         btn.Font = Enum.Font.GothamBold
         btn.Parent = tabFrame
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
         btn.MouseButton1Click:Connect(function()
             local ok, err = pcall(function() action.Callback(btn) end)
             if not ok then
                 warn("[TurboOptimizer] Error en botón:", err)
             end
         end)
+        totalBtnHeight = totalBtnHeight + buttonHeight + 8
     end
+    tabHeights[tabName] = math.clamp(contentY + totalBtnHeight + 20, minHeight, maxHeight)
 end
+
+tabsBar.CanvasSize = UDim2.new(0, tabsList.AbsoluteContentSize.X, 1, 0)
 
 local function showTab(tabName)
     for name, tab in pairs(tabFrames) do
         tab.Visible = (name == tabName)
     end
+    local newHeight = tabHeights[tabName] or minHeight
+    frame.Size = UDim2.fromOffset(FRAME_WIDTH, newHeight)
+    closeBtn.Position = UDim2.fromOffset(FRAME_WIDTH - 40, 4)
 end
 for _, btn in ipairs(tabButtons) do
     btn.MouseButton1Click:Connect(function()
@@ -443,10 +470,14 @@ for _, btn in ipairs(tabButtons) do
 end
 showTab(tabButtons[1].Text)
 
--- FPS promedio para Auto Mode
+-- FPS y memoria en tiempo real
 RunService.RenderStepped:Connect(function(dt)
     avgDt = avgDt + (dt - avgDt) * 0.15
     avgFps = math.max(1, math.floor(1/avgDt + 0.5))
+    fpsLabel.Text = "FPS: " .. avgFps
+    fpsLabel.TextColor3 = (avgFps >= 50 and Color3.new(0,1,0)) or (avgFps >= 30 and Color3.new(1,1,0)) or Color3.new(1,0,0)
+    local luaMB = math.floor((collectgarbage("count")/1024) * 10 + 0.5)/10
+    memLabel.Text = ("Mem: %.1f MB"):format(luaMB)
 end)
 
 -- Auto Mode: cambia perfil según FPS cada segundo
@@ -486,7 +517,7 @@ end)
 
 -- Info de atajos
 local shortcutLabel = Instance.new("TextLabel")
-shortcutLabel.Size = UDim2.new(1, -20, 0, 22)
+shortcutLabel.Size = UDim2.new(1, -20, 0, 20)
 shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 26)
 shortcutLabel.BackgroundTransparency = 1
 shortcutLabel.Text = "Atajos: U=Ultra+ | R=Restaurar | N=Negro | Panel arrastrable"
@@ -498,4 +529,4 @@ shortcutLabel.Parent = frame
 -- Inicializar
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Tabs Cargado. Atajos: U, R, N")
+print("[TurboOptimizer] Panel Plus Cargado. Atajos: U, R, N")
