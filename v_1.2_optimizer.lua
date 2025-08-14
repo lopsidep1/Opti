@@ -1,4 +1,4 @@
--- Turbo Optimizer Panel Fixed - GUI con pestañas, área dinámica, FPS/memoria en tiempo real.
+-- Turbo Optimizer Panel - FPS y Mem en tiempo real, label atajos abajo siempre visible
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -15,7 +15,10 @@ local avgDt, avgFps = 1/60, 60
 local currentProfile = "Medio"
 local autoMode = false
 
--- Funciones de estado original y optimización
+local FRAME_WIDTH = 500
+local MIN_HEIGHT = 220
+local MAX_HEIGHT = 480
+
 local function ensureSaved(obj, props)
     if not obj then return end
     baseline.Props[obj] = baseline.Props[obj] or {}
@@ -213,9 +216,6 @@ local function toggleBlack()
 end
 
 -- GUI principal
-local FRAME_WIDTH = 500
-local MIN_HEIGHT = 220
-local MAX_HEIGHT = 480
 guiMain = Instance.new("ScreenGui")
 guiMain.Name = "TurboPanel"
 guiMain.ResetOnSpawn = false
@@ -334,7 +334,6 @@ statusLabel.Font = Enum.Font.Gotham
 statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 statusLabel.Parent = frame
 
--- FPS y memoria
 fpsLabel = Instance.new("TextLabel")
 fpsLabel.Size = UDim2.new(0, 90, 0, 18)
 fpsLabel.Position = UDim2.fromOffset(8, 62)
@@ -355,7 +354,17 @@ memLabel.Font = Enum.Font.Code
 memLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
 memLabel.Parent = frame
 
--- Pestañas scroll horizontal
+shortcutLabel = Instance.new("TextLabel")
+shortcutLabel.Size = UDim2.new(1, -20, 0, 20)
+shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 26)
+shortcutLabel.BackgroundTransparency = 1
+shortcutLabel.Text = "Atajos: U=Ultra+ | R=Restaurar | N=Negro | Panel arrastrable"
+shortcutLabel.TextScaled = true
+shortcutLabel.Font = Enum.Font.Gotham
+shortcutLabel.TextColor3 = Color3.fromRGB(180, 220, 255)
+shortcutLabel.Parent = frame
+
+-- Pestañas scroll horizontal + área de contenido dinámico
 local tabs = {
     ["🔄 Restaurar"] = {
         {Text = "Restaurar todo", Callback = restoreAll},
@@ -420,9 +429,8 @@ contentLayout.Parent = contentArea
 contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
 contentLayout.Padding = UDim.new(0, 10)
 
-local tabContents = {} -- [tabName] = {buttons}
+local tabContents = {}
 
--- Crear pestañas y botones
 for tabName, actions in pairs(tabs) do
     local tabBtn = Instance.new("TextButton")
     tabBtn.Size = UDim2.new(0, 126, 1, -8)
@@ -460,7 +468,6 @@ end
 
 tabsBar.CanvasSize = UDim2.new(0, tabsList.AbsoluteContentSize.X, 1, 0)
 
--- Mostrar botones de la pestaña y ajustar tamaño
 local function showTab(tabName)
     for t, btns in pairs(tabContents) do
         for _, b in ipairs(btns) do
@@ -481,17 +488,17 @@ for i, btn in ipairs(tabButtons) do
 end
 showTab(tabButtons[1].Text)
 
--- FPS y memoria en tiempo real
 RunService.RenderStepped:Connect(function(dt)
-    avgDt = avgDt + (dt - avgDt) * 0.15
-    avgFps = math.max(1, math.floor(1/avgDt + 0.5))
-    fpsLabel.Text = "FPS: " .. avgFps
-    fpsLabel.TextColor3 = (avgFps >= 50 and Color3.new(0,1,0)) or (avgFps >= 30 and Color3.new(1,1,0)) or Color3.new(1,0,0)
-    local luaMB = math.floor((collectgarbage("count")/1024) * 10 + 0.5)/10
-    memLabel.Text = ("Mem: %.1f MB"):format(luaMB)
+    if fpsLabel and memLabel then
+        avgDt = avgDt + (dt - avgDt) * 0.15
+        avgFps = math.max(1, math.floor(1/avgDt + 0.5))
+        fpsLabel.Text = "FPS: " .. avgFps
+        fpsLabel.TextColor3 = (avgFps >= 50 and Color3.new(0,1,0)) or (avgFps >= 30 and Color3.new(1,1,0)) or Color3.new(1,0,0)
+        local luaMB = math.floor((collectgarbage("count")/1024) * 10 + 0.5)/10
+        memLabel.Text = ("Mem: %.1f MB"):format(luaMB)
+    end
 end)
 
--- Auto Mode: cambia perfil según FPS cada segundo
 task.spawn(function()
     local lastApplied = currentProfile
     while guiMain.Parent do
@@ -514,7 +521,6 @@ task.spawn(function()
     end
 end)
 
--- Atajos de teclado
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.U then
@@ -526,18 +532,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- Info de atajos
-shortcutLabel = Instance.new("TextLabel")
-shortcutLabel.Size = UDim2.new(1, -20, 0, 20)
-shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 26)
-shortcutLabel.BackgroundTransparency = 1
-shortcutLabel.Text = "Atajos: U=Ultra+ | R=Restaurar | N=Negro | Panel arrastrable"
-shortcutLabel.TextScaled = true
-shortcutLabel.Font = Enum.Font.Gotham
-shortcutLabel.TextColor3 = Color3.fromRGB(180, 220, 255)
-shortcutLabel.Parent = frame
-
--- Inicializar
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Fixed Cargado. Atajos: U, R, N")
+print("[TurboOptimizer] Panel FPS/Mem Fixed Cargado. Atajos: U, R, N")
