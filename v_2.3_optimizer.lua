@@ -1,5 +1,4 @@
--- TURBO OPTIMIZER PANEL - ULTRA++ VERSION ESTABLE CON CONTADORES Y SCROLL
--- Fix: UIListLayout access is now done via FindFirstChildOfClass, never contentFrame.UIListLayout
+-- TURBO OPTIMIZER PANEL - ULTRA y ULTRA++ por separado, contadores adaptativos y latencia de red (ms)
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -9,11 +8,12 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Camera = Workspace.CurrentCamera
+local Stats = game:GetService("Stats")
 local player = Players.LocalPlayer
 
 local FRAME_MIN_WIDTH = 380
 local FRAME_MIN_HEIGHT = 220
-local FRAME_MAX_WIDTH = 800
+local FRAME_MAX_WIDTH = 900
 local FRAME_MAX_HEIGHT = 700
 local frameWidth = 520
 local frameHeight = 400
@@ -27,110 +27,9 @@ local panelVisible = true
 
 -- Contadores
 local fpsNow, fpsSum, fpsMin, fpsMax, fpsCount = 60, 0, 60, 60, 0
+local pingNow = 0
 
--- -------- EXTREME OPTIMIZATION FUNCTIONS --------
-local function removeVisualEffects()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("SurfaceGui") or obj:IsA("BillboardGui") or obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("VideoFrame") then
-            baseline.Effects[obj] = obj.Parent
-            obj:Destroy()
-        end
-    end
-end
-
-local function reduceMeshesQuality()
-    for _, mesh in ipairs(Workspace:GetDescendants()) do
-        if mesh:IsA("MeshPart") then
-            mesh.RenderFidelity = Enum.RenderFidelity.Performance
-        end
-        if mesh:IsA("SpecialMesh") then
-            mesh.TextureId = ""
-        end
-    end
-end
-
-local function limitCameraDistance()
-    if Camera then
-        baseline.Camera.MaxDistance = Camera.MaxDistance or 1000
-        Camera.MaxDistance = 80
-        Camera.FieldOfView = 60
-    end
-end
-
-local function pauseScripts()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Script") or obj:IsA("LocalScript") then
-            if obj.Enabled == true then
-                baseline.Props[obj] = baseline.Props[obj] or {}
-                baseline.Props[obj].Enabled = true
-                obj.Enabled = false
-            end
-        end
-    end
-end
-
-local function stopAnimations()
-    for _, humanoid in ipairs(Workspace:GetDescendants()) do
-        if humanoid:IsA("Humanoid") then
-            for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
-                track:Stop()
-            end
-        end
-    end
-end
-
-local function removeAmbientSounds()
-    for _, snd in ipairs(Workspace:GetDescendants()) do
-        if snd:IsA("Sound") and snd.Looped then
-            snd:Stop()
-            snd.Volume = 0
-        end
-    end
-end
-
-local function simpleSkybox()
-    for _, child in ipairs(Lighting:GetChildren()) do
-        if child:IsA("Sky") then
-            baseline.Skybox = child
-            child:Destroy()
-        end
-    end
-    local sky = Instance.new("Sky")
-    sky.SkyboxBk = ""
-    sky.SkyboxDn = ""
-    sky.SkyboxFt = ""
-    sky.SkyboxLf = ""
-    sky.SkyboxRt = ""
-    sky.SkyboxUp = ""
-    sky.Parent = Lighting
-end
-
-local function compatibilityLighting()
-    baseline.Lighting.Technology = Lighting.Technology
-    Lighting.Technology = Enum.Technology.Compatibility
-    Lighting.GlobalShadows = false
-    Lighting.Brightness = 0.3
-    Lighting.OutdoorAmbient = Color3.fromRGB(70,70,70)
-end
-
-local function restoreExtreme()
-    if baseline.Camera.MaxDistance then
-        Camera.MaxDistance = baseline.Camera.MaxDistance
-    end
-    if baseline.Skybox then
-        baseline.Skybox.Parent = Lighting
-    end
-    if baseline.Lighting.Technology then
-        Lighting.Technology = baseline.Lighting.Technology
-    end
-    for obj, props in pairs(baseline.Props) do
-        if obj and props.Enabled ~= nil then
-            obj.Enabled = props.Enabled
-        end
-    end
-end
-
--- --------- SNAPSHOT, RESTORE, ETC. ---------
+-- -------- OPTIMIZACIONES --------
 local function ensureSaved(obj, props)
     if not obj then return end
     baseline.Props[obj] = baseline.Props[obj] or {}
@@ -173,7 +72,6 @@ local function restoreAll()
             end
         end
     end
-    restoreExtreme()
     if blackFrame then blackFrame.Visible = false end
     if statusLabel then statusLabel.Text = "Estado: Restaurado" end
 end
@@ -240,7 +138,43 @@ local function ultraRendimiento()
             pcall(function() part.RenderFidelity = Enum.RenderFidelity.Performance end)
         end
     end
-    if statusLabel then statusLabel.Text = "Estado: Ultra+ activado" end
+    if statusLabel then statusLabel.Text = "Estado: Ultra activado" end
+end
+
+local function ultraRendimientoPlus()
+    -- Ultra + visuales + meshes + scripts + skybox + lighting + animaciones + sonidos
+    ultraRendimiento()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("SurfaceGui") or obj:IsA("BillboardGui") or obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("VideoFrame") then
+            obj:Destroy()
+        end
+        if obj:IsA("MeshPart") then
+            obj.RenderFidelity = Enum.RenderFidelity.Performance
+        end
+        if obj:IsA("SpecialMesh") then
+            obj.TextureId = ""
+        end
+        if obj:IsA("Script") or obj:IsA("LocalScript") then
+            if obj.Enabled == true then obj.Enabled = false end
+        end
+        if obj:IsA("Humanoid") then
+            for _, track in ipairs(obj:GetPlayingAnimationTracks()) do track:Stop() end
+        end
+        if obj:IsA("Sound") and obj.Looped then
+            obj:Stop()
+            obj.Volume = 0
+        end
+    end
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("Sky") then child:Destroy() end
+    end
+    local sky = Instance.new("Sky")
+    sky.Parent = Lighting
+    Lighting.Technology = Enum.Technology.Compatibility
+    Lighting.GlobalShadows = false
+    Lighting.Brightness = 0.3
+    Lighting.OutdoorAmbient = Color3.fromRGB(70,70,70)
+    if statusLabel then statusLabel.Text = "Estado: Ultra++ EXTREMO activado" end
 end
 
 local function muteAll()
@@ -419,96 +353,8 @@ handleIcon.BackgroundTransparency = 1
 handleIcon.Image = "rbxassetid://6015418713"
 handleIcon.ImageColor3 = Color3.fromRGB(200, 180, 255)
 
-handle.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        resizing = true
-        local startMouse = UserInputService:GetMouseLocation()
-        local startSize = frame.Size
-        local startPos = frame.Position
-        local con; con = UserInputService.InputChanged:Connect(function(inp)
-            if resizing and inp.UserInputType == Enum.UserInputType.MouseMovement then
-                local mouse = UserInputService:GetMouseLocation()
-                local delta = mouse - startMouse
-                frameWidth = math.clamp(startSize.X.Offset + delta.X, FRAME_MIN_WIDTH, FRAME_MAX_WIDTH)
-                frameHeight = math.clamp(startSize.Y.Offset + delta.Y, FRAME_MIN_HEIGHT, FRAME_MAX_HEIGHT)
-                frame.Size = UDim2.fromOffset(frameWidth, frameHeight)
-                shadow.Size = UDim2.fromOffset(frameWidth+48, frameHeight+64)
-                closeBtn.Position = UDim2.fromOffset(frameWidth - 44, 8)
-                handle.Position = UDim2.new(1, -22, 1, -22)
-                shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 28)
-                tabsBar.Size = UDim2.new(1, -24, 0, tabHeight)
-                for _, f in pairs(contentFrames) do
-                    f.Size = UDim2.new(1, 0, 1, 0)
-                    if f:IsA("ScrollingFrame") then
-                        local list = f:FindFirstChildOfClass("UIListLayout")
-                        if list then
-                            f.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y)
-                        end
-                    end
-                end
-            end
-        end)
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                resizing = false
-                if con then con:Disconnect() end
-            end
-        end)
-    end
-end)
-
-local dragging, dragStart, startPos
-local function clampToViewport(x, y)
-    local cam = workspace.CurrentCamera
-    local view = cam and cam.ViewportSize or Vector2.new(1920, 1080)
-    local sz = frame.AbsoluteSize
-    return math.clamp(x, 0, view.X - sz.X), math.clamp(y, 0, view.Y - sz.Y)
-end
-frame.InputBegan:Connect(function(input)
-    if not dragEnabled then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and dragEnabled then
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            local delta = input.Position - dragStart
-            local x, y = startPos.X.Offset + delta.X, startPos.Y.Offset + delta.Y
-            local cx, cy = clampToViewport(x, y)
-            frame.Position = UDim2.fromOffset(cx, cy)
-            shadow.Position = UDim2.fromOffset(cx-20, cy-20)
-        end
-    end
-end)
-openBtn.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = openBtn.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if dragging then
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            local delta = input.Position - dragStart
-            openBtn.Position = UDim2.fromOffset(
-                startPos.X.Offset + delta.X,
-                startPos.Y.Offset + delta.Y
-            )
-        end
-    end
-end)
-
-statusLabel = Instance.new("TextLabel")
+-- Contadores (adaptativos)
+local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -10, 0, 22)
 statusLabel.Position = UDim2.fromOffset(8, 46)
 statusLabel.BackgroundTransparency = 1
@@ -519,66 +365,45 @@ statusLabel.TextColor3 = Color3.fromRGB(210, 170, 255)
 statusLabel.ZIndex = 2
 statusLabel.Parent = frame
 
-fpsLabel = Instance.new("TextLabel")
-fpsLabel.Size = UDim2.new(0, 90, 0, 18)
-fpsLabel.Position = UDim2.fromOffset(12, 72)
-fpsLabel.BackgroundTransparency = 1
-fpsLabel.Text = "FPS: ..."
-fpsLabel.TextScaled = true
-fpsLabel.Font = Enum.Font.Code
-fpsLabel.TextColor3 = Color3.fromRGB(100, 255, 200)
-fpsLabel.ZIndex = 2
-fpsLabel.Parent = frame
+local countersFrame = Instance.new("Frame")
+countersFrame.Name = "CountersFrame"
+countersFrame.BackgroundTransparency = 1
+countersFrame.Size = UDim2.new(1, -24, 0, 26)
+countersFrame.Position = UDim2.fromOffset(12, 72)
+countersFrame.ZIndex = 2
+countersFrame.Parent = frame
 
-fpsAvgLabel = Instance.new("TextLabel")
-fpsAvgLabel.Size = UDim2.new(0, 110, 0, 18)
-fpsAvgLabel.Position = UDim2.fromOffset(110, 72)
-fpsAvgLabel.BackgroundTransparency = 1
-fpsAvgLabel.Text = "FPS Avg: ..."
-fpsAvgLabel.TextScaled = true
-fpsAvgLabel.Font = Enum.Font.Code
-fpsAvgLabel.TextColor3 = Color3.fromRGB(120, 200, 255)
-fpsAvgLabel.ZIndex = 2
-fpsAvgLabel.Parent = frame
+local countersLayout = Instance.new("UIListLayout", countersFrame)
+countersLayout.FillDirection = Enum.FillDirection.Horizontal
+countersLayout.Padding = UDim.new(0,8)
+countersLayout.SortOrder = Enum.SortOrder.LayoutOrder
+countersLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
-fpsMinLabel = Instance.new("TextLabel")
-fpsMinLabel.Size = UDim2.new(0, 110, 0, 18)
-fpsMinLabel.Position = UDim2.fromOffset(220, 72)
-fpsMinLabel.BackgroundTransparency = 1
-fpsMinLabel.Text = "FPS Min: ..."
-fpsMinLabel.TextScaled = true
-fpsMinLabel.Font = Enum.Font.Code
-fpsMinLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
-fpsMinLabel.ZIndex = 2
-fpsMinLabel.Parent = frame
+local function mkCounter(text, color)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0, 110, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextScaled = true
+    lbl.Font = Enum.Font.Code
+    lbl.TextColor3 = color
+    lbl.ZIndex = 2
+    lbl.Parent = countersFrame
+    return lbl
+end
 
-fpsMaxLabel = Instance.new("TextLabel")
-fpsMaxLabel.Size = UDim2.new(0, 110, 0, 18)
-fpsMaxLabel.Position = UDim2.fromOffset(330, 72)
-fpsMaxLabel.BackgroundTransparency = 1
-fpsMaxLabel.Text = "FPS Max: ..."
-fpsMaxLabel.TextScaled = true
-fpsMaxLabel.Font = Enum.Font.Code
-fpsMaxLabel.TextColor3 = Color3.fromRGB(120, 255, 120)
-fpsMaxLabel.ZIndex = 2
-fpsMaxLabel.Parent = frame
+local fpsLabel      = mkCounter("FPS: ...", Color3.fromRGB(100, 255, 200))
+local fpsAvgLabel   = mkCounter("FPS Avg: ...", Color3.fromRGB(120, 200, 255))
+local fpsMinLabel   = mkCounter("FPS Min: ...", Color3.fromRGB(255, 120, 120))
+local fpsMaxLabel   = mkCounter("FPS Max: ...", Color3.fromRGB(120, 255, 120))
+local pingLabel     = mkCounter("Ping: ...", Color3.fromRGB(200, 220, 120))
+local memLabel      = mkCounter("Mem: ...", Color3.fromRGB(120, 180, 255))
 
-memLabel = Instance.new("TextLabel")
-memLabel.Size = UDim2.new(0, 110, 0, 18)
-memLabel.Position = UDim2.fromOffset(440, 72)
-memLabel.BackgroundTransparency = 1
-memLabel.Text = "Mem: ..."
-memLabel.TextScaled = true
-memLabel.Font = Enum.Font.Code
-memLabel.TextColor3 = Color3.fromRGB(120, 180, 255)
-memLabel.ZIndex = 2
-memLabel.Parent = frame
-
-shortcutLabel = Instance.new("TextLabel")
+local shortcutLabel = Instance.new("TextLabel")
 shortcutLabel.Size = UDim2.new(1, -20, 0, 20)
 shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 28)
 shortcutLabel.BackgroundTransparency = 1
-shortcutLabel.Text = "Atajos: U=Ultra+ | R=Restaurar | N/B=Negro | F1=Panel | Panel arrastrable/esquina"
+shortcutLabel.Text = "Atajos: U=Ultra | P=Ultra++ | R=Restaurar | N/B=Negro | F1=Panel | Panel arrastrable/esquina"
 shortcutLabel.TextScaled = true
 shortcutLabel.Font = Enum.Font.Gotham
 shortcutLabel.TextColor3 = Color3.fromRGB(170, 140, 255)
@@ -589,8 +414,7 @@ shortcutLabel.Parent = frame
 local tabs = {
     ["🔄 Restaurar"] = {
         {Text = "🌀 Restaurar todo", Callback = restoreAll},
-        {Text = "🌑 Pantalla negra ON/OFF", Callback = toggleBlack},
-        {Text = "🔙 Restaurar EXTREMO", Callback = restoreExtreme}
+        {Text = "🌑 Pantalla negra ON/OFF", Callback = toggleBlack}
     },
     ["🧩 Perfiles"] = {
         {Text = "⏬ Bajo", Callback = function() applyProfile("Bajo") end},
@@ -608,28 +432,8 @@ local tabs = {
         {Text = "🖼 Ocultar GUIs decorativos", Callback = hideDecorGUIs},
         {Text = "🧱 Optimizar materiales", Callback = optimizeMaterials},
         {Text = "🛠 Optimizar físicas", Callback = optimizePhysics},
-        {Text = "🚫 Quitar efectos visuales (SurfaceGui, Decal, Texture...)", Callback = removeVisualEffects},
-        {Text = "📦 Reducir calidad de meshes y texturas", Callback = reduceMeshesQuality},
-        {Text = "🎥 Limitar distancia de cámara", Callback = limitCameraDistance},
-        {Text = "⏸ Pausar scripts secundarios", Callback = pauseScripts},
-        {Text = "🔕 Detener animaciones", Callback = stopAnimations},
-        {Text = "🔉 Eliminar sonidos ambientales", Callback = removeAmbientSounds},
-        {Text = "🌌 Skybox simple", Callback = simpleSkybox},
-        {Text = "💡 Lighting Compatibility", Callback = compatibilityLighting}
-    },
-    ["🚀 Ultra++"] = {
-        {Text = "🔥 Ultra++: Optimización EXTREMA", Callback = function()
-            removeVisualEffects()
-            reduceMeshesQuality()
-            limitCameraDistance()
-            pauseScripts()
-            stopAnimations()
-            removeAmbientSounds()
-            simpleSkybox()
-            compatibilityLighting()
-            ultraRendimiento()
-            statusLabel.Text = "Estado: Ultra++ EXTREMO activado"
-        end}
+        {Text = "🚀 Ultra", Callback = ultraRendimiento},
+        {Text = "🔥 Ultra++", Callback = ultraRendimientoPlus}
     }
 }
 
@@ -780,26 +584,130 @@ for i, btn in ipairs(tabButtons) do
 end
 showTab(tabButtons[1].Text)
 
+-- Resize/arrastre/contadores adaptativos
+handle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        resizing = true
+        local startMouse = UserInputService:GetMouseLocation()
+        local startSize = frame.Size
+        local startPos = frame.Position
+        local con; con = UserInputService.InputChanged:Connect(function(inp)
+            if resizing and inp.UserInputType == Enum.UserInputType.MouseMovement then
+                local mouse = UserInputService:GetMouseLocation()
+                local delta = mouse - startMouse
+                frameWidth = math.clamp(startSize.X.Offset + delta.X, FRAME_MIN_WIDTH, FRAME_MAX_WIDTH)
+                frameHeight = math.clamp(startSize.Y.Offset + delta.Y, FRAME_MIN_HEIGHT, FRAME_MAX_HEIGHT)
+                frame.Size = UDim2.fromOffset(frameWidth, frameHeight)
+                shadow.Size = UDim2.fromOffset(frameWidth+48, frameHeight+64)
+                closeBtn.Position = UDim2.fromOffset(frameWidth - 44, 8)
+                handle.Position = UDim2.new(1, -22, 1, -22)
+                shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 28)
+                tabsBar.Size = UDim2.new(1, -24, 0, tabHeight)
+                countersFrame.Size = UDim2.new(1, -24, 0, math.max(26, math.floor(frameHeight/18)))
+                for _, f in pairs(contentFrames) do
+                    f.Size = UDim2.new(1, 0, 1, 0)
+                    if f:IsA("ScrollingFrame") then
+                        local list = f:FindFirstChildOfClass("UIListLayout")
+                        if list then
+                            f.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y)
+                        end
+                    end
+                end
+            end
+        end)
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                resizing = false
+                if con then con:Disconnect() end
+            end
+        end)
+    end
+end)
+
+local dragging, dragStart, startPos
+local function clampToViewport(x, y)
+    local cam = workspace.CurrentCamera
+    local view = cam and cam.ViewportSize or Vector2.new(1920, 1080)
+    local sz = frame.AbsoluteSize
+    return math.clamp(x, 0, view.X - sz.X), math.clamp(y, 0, view.Y - sz.Y)
+end
+frame.InputBegan:Connect(function(input)
+    if not dragEnabled then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and dragEnabled then
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStart
+            local x, y = startPos.X.Offset + delta.X, startPos.Y.Offset + delta.Y
+            local cx, cy = clampToViewport(x, y)
+            frame.Position = UDim2.fromOffset(cx, cy)
+            shadow.Position = UDim2.fromOffset(cx-20, cy-20)
+        end
+    end
+end)
+openBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = openBtn.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging then
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStart
+            openBtn.Position = UDim2.fromOffset(
+                startPos.X.Offset + delta.X,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end
+end)
+
+-- FPS/Contadores/Ping
 RunService.RenderStepped:Connect(function(dt)
     fpsNow = math.round(1/dt)
     fpsSum = fpsSum + fpsNow
     fpsCount = fpsCount + 1
     fpsMin = math.min(fpsMin, fpsNow)
     fpsMax = math.max(fpsMax, fpsNow)
-    if fpsLabel and fpsAvgLabel and fpsMinLabel and fpsMaxLabel and memLabel then
-        fpsLabel.Text = "FPS: " .. fpsNow
-        fpsAvgLabel.Text = ("FPS Avg: %d"):format(fpsCount > 0 and math.floor(fpsSum/fpsCount) or fpsNow)
-        fpsMinLabel.Text = ("FPS Min: %d"):format(fpsMin)
-        fpsMaxLabel.Text = ("FPS Max: %d"):format(fpsMax)
-        local luaMB = math.floor((collectgarbage("count")/1024) * 10 + 0.5)/10
-        memLabel.Text = ("Mem: %.1f MB"):format(luaMB)
+    local netPing = 0
+    if Stats then
+        local netStats = Stats:FindFirstChild("PerformanceStats")
+        if netStats then
+            local p = netStats:FindFirstChild("Ping")
+            if p and p:GetAttribute("Value") then
+                netPing = math.floor(p:GetAttribute("Value"))
+            end
+        end
     end
+    pingNow = netPing
+    fpsLabel.Text = "FPS: " .. fpsNow
+    fpsAvgLabel.Text = ("FPS Avg: %d"):format(fpsCount > 0 and math.floor(fpsSum/fpsCount) or fpsNow)
+    fpsMinLabel.Text = ("FPS Min: %d"):format(fpsMin)
+    fpsMaxLabel.Text = ("FPS Max: %d"):format(fpsMax)
+    pingLabel.Text = ("Ping: %d ms"):format(pingNow)
+    local luaMB = math.floor((collectgarbage("count")/1024) * 10 + 0.5)/10
+    memLabel.Text = ("Mem: %.1f MB"):format(luaMB)
 end)
 
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.U then
         ultraRendimiento()
+    elseif input.KeyCode == Enum.KeyCode.P then
+        ultraRendimientoPlus()
     elseif input.KeyCode == Enum.KeyCode.R then
         restoreAll()
     elseif input.KeyCode == Enum.KeyCode.N or input.KeyCode == Enum.KeyCode.B then
@@ -821,4 +729,4 @@ end)
 
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Ultra++ ESTABLE cargado y probado. Scroll y botones funcionando. FPS avg/min/max/mem OK.")
+print("[TurboOptimizer] Panel Ultra y Ultra++ por separado, contadores adaptativos y ping funcionando.")
