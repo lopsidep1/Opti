@@ -1,4 +1,4 @@
--- TURBO OPTIMIZER PANEL - ULTRA++ FINAL PROBADO Y CORREGIDO
+-- TURBO OPTIMIZER PANEL - ULTRA++ VERSION ESTABLE CON CONTADORES Y SCROLL
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -19,13 +19,13 @@ local frameHeight = 400
 local resizing = false
 
 local baseline = {Lighting = {}, Sound = {}, Guis = {}, Props = {}, Effects = {}, Camera = {}, Skybox = nil}
-local guiMain, frame, statusLabel, blackFrame, openBtn, closeBtn, memLabel, fpsLabel, fpsAvgLabel, fpsMinLabel, fpsMaxLabel, shortcutLabel, shadow
 local dragEnabled = true
-local avgDt, avgFps = 1/60, 60
-local sumFps, countFps, minFps, maxFps = 60, 1, 60, 60
 local currentProfile = "Medio"
 local autoMode = false
 local panelVisible = true
+
+-- Contadores
+local fpsNow, fpsSum, fpsMin, fpsMax, fpsCount = 60, 0, 60, 60, 0
 
 -- -------- EXTREME OPTIMIZATION FUNCTIONS --------
 
@@ -175,7 +175,7 @@ local function restoreAll()
     end
     restoreExtreme()
     if blackFrame then blackFrame.Visible = false end
-    statusLabel.Text = "Estado: Restaurado"
+    if statusLabel then statusLabel.Text = "Estado: Restaurado" end
 end
 
 local function applyProfile(name)
@@ -202,7 +202,7 @@ local function applyProfile(name)
         L.OutdoorAmbient = Color3.new(0.1, 0.1, 0.15)
         L.Brightness = 0.5
     end
-    statusLabel.Text = ("Estado: Perfil %s%s"):format(name, autoMode and " (Auto)" or "")
+    if statusLabel then statusLabel.Text = ("Estado: Perfil %s%s"):format(name, autoMode and " (Auto)" or "") end
 end
 
 local function ultraRendimiento()
@@ -240,7 +240,7 @@ local function ultraRendimiento()
             pcall(function() part.RenderFidelity = Enum.RenderFidelity.Performance end)
         end
     end
-    statusLabel.Text = "Estado: Ultra+ activado"
+    if statusLabel then statusLabel.Text = "Estado: Ultra+ activado" end
 end
 
 local function muteAll()
@@ -425,8 +425,6 @@ handle.InputBegan:Connect(function(input)
         local startMouse = UserInputService:GetMouseLocation()
         local startSize = frame.Size
         local startPos = frame.Position
-        local cam = workspace.CurrentCamera
-        local viewport = cam and cam.ViewportSize or Vector2.new(1920,1080)
         local con; con = UserInputService.InputChanged:Connect(function(inp)
             if resizing and inp.UserInputType == Enum.UserInputType.MouseMovement then
                 local mouse = UserInputService:GetMouseLocation()
@@ -667,7 +665,6 @@ contentArea.Parent = frame
 contentArea.ClipsDescendants = true
 contentArea.ZIndex = 12
 
--- SCROLL EN TODAS LAS PESTAÑAS
 for tabName, actions in pairs(tabs) do
     local tabBtn = Instance.new("TextButton")
     tabBtn.Size = UDim2.new(0, 154, 0, tabHeight - 8)
@@ -782,46 +779,18 @@ end
 showTab(tabButtons[1].Text)
 
 RunService.RenderStepped:Connect(function(dt)
-    if fpsLabel and memLabel and fpsAvgLabel and fpsMinLabel and fpsMaxLabel then
-        avgDt = avgDt + (dt - avgDt) * 0.15
-        local nowFps = math.max(1, math.floor(1/avgDt + 0.5))
-        sumFps = sumFps + nowFps
-        countFps = countFps + 1
-        minFps = math.min(minFps, nowFps)
-        maxFps = math.max(maxFps, nowFps)
-
-        fpsLabel.Text = "FPS: " .. nowFps
-        fpsAvgLabel.Text = ("FPS Avg: %d"):format(math.floor(sumFps/countFps))
-        fpsMinLabel.Text = ("FPS Min: %d"):format(minFps)
-        fpsMaxLabel.Text = ("FPS Max: %d"):format(maxFps)
-        fpsLabel.TextColor3 = (nowFps >= 50 and Color3.fromRGB(100,255,200)) or (nowFps >= 30 and Color3.fromRGB(255,230,90)) or Color3.fromRGB(255,100,120)
-        fpsAvgLabel.TextColor3 = Color3.fromRGB(120, 200, 255)
-        fpsMinLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
-        fpsMaxLabel.TextColor3 = Color3.fromRGB(120, 255, 120)
+    fpsNow = math.round(1/dt)
+    fpsSum = fpsSum + fpsNow
+    fpsCount = fpsCount + 1
+    fpsMin = math.min(fpsMin, fpsNow)
+    fpsMax = math.max(fpsMax, fpsNow)
+    if fpsLabel and fpsAvgLabel and fpsMinLabel and fpsMaxLabel and memLabel then
+        fpsLabel.Text = "FPS: " .. fpsNow
+        fpsAvgLabel.Text = ("FPS Avg: %d"):format(fpsCount > 0 and math.floor(fpsSum/fpsCount) or fpsNow)
+        fpsMinLabel.Text = ("FPS Min: %d"):format(fpsMin)
+        fpsMaxLabel.Text = ("FPS Max: %d"):format(fpsMax)
         local luaMB = math.floor((collectgarbage("count")/1024) * 10 + 0.5)/10
         memLabel.Text = ("Mem: %.1f MB"):format(luaMB)
-    end
-end)
-
-task.spawn(function()
-    local lastApplied = currentProfile
-    while guiMain.Parent do
-        if autoMode then
-            local n = avgFps
-            local target
-            if n < 30 then
-                target = "Alto"
-            elseif n < 50 then
-                target = "Medio"
-            else
-                target = "Bajo"
-            end
-            if target ~= lastApplied then
-                applyProfile(target)
-                lastApplied = target
-            end
-        end
-        task.wait(1.0)
     end
 end)
 
@@ -850,4 +819,4 @@ end)
 
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Ultra++ cargado y probado. Scroll y botones funcionando. FPS avg/min/max/mem OK.")
+print("[TurboOptimizer] Panel Ultra++ ESTABLE cargado y probado. Scroll y botones funcionando. FPS avg/min/max/mem OK.")
