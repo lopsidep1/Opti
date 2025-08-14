@@ -1,4 +1,5 @@
--- Turbo Optimizer Panel Plus - Versión mejorada: área dinámica y botones visibles
+-- Turbo Optimizer Panel Fixed - GUI con pestañas, área dinámica, FPS/memoria en tiempo real.
+
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
@@ -8,13 +9,13 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 local baseline = {Lighting = {}, Sound = {}, Guis = {}, Props = {}}
-local guiMain, frame, statusLabel, blackFrame, openBtn, closeBtn, memLabel, fpsLabel
+local guiMain, frame, statusLabel, blackFrame, openBtn, closeBtn, memLabel, fpsLabel, shortcutLabel
 local dragEnabled = true
 local avgDt, avgFps = 1/60, 60
 local currentProfile = "Medio"
 local autoMode = false
 
--- Guardar estado original
+-- Funciones de estado original y optimización
 local function ensureSaved(obj, props)
     if not obj then return end
     baseline.Props[obj] = baseline.Props[obj] or {}
@@ -212,15 +213,14 @@ local function toggleBlack()
 end
 
 -- GUI principal
+local FRAME_WIDTH = 500
+local MIN_HEIGHT = 220
+local MAX_HEIGHT = 480
 guiMain = Instance.new("ScreenGui")
 guiMain.Name = "TurboPanel"
 guiMain.ResetOnSpawn = false
 guiMain.IgnoreGuiInset = false
 guiMain.Parent = player:WaitForChild("PlayerGui")
-
-local FRAME_WIDTH = 500
-local MIN_HEIGHT = 220
-local MAX_HEIGHT = 480
 
 frame = Instance.new("Frame")
 frame.Size = UDim2.fromOffset(FRAME_WIDTH, MIN_HEIGHT)
@@ -235,7 +235,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -40, 0, 32)
 title.Position = UDim2.fromOffset(20, 0)
 title.BackgroundTransparency = 1
-title.Text = "Turbo Optimizer Panel Plus"
+title.Text = "Turbo Optimizer Panel"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.TextSize = 22
 title.Font = Enum.Font.GothamBold
@@ -355,7 +355,7 @@ memLabel.Font = Enum.Font.Code
 memLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
 memLabel.Parent = frame
 
--- Tabs y botones - Scroll horizontal
+-- Pestañas scroll horizontal
 local tabs = {
     ["🔄 Restaurar"] = {
         {Text = "Restaurar todo", Callback = restoreAll},
@@ -383,14 +383,10 @@ local tabs = {
     }
 }
 
-local tabButtons, tabFrames, tabHeights = {}, {}, {}
+local tabButtons = {}
 local tabY = 88
 local tabHeight = 36
 local tabSpacing = 8
-local contentY = tabY + tabHeight + 10
-local buttonHeight = 38
-local minHeight = MIN_HEIGHT
-local maxHeight = MAX_HEIGHT
 
 local tabsBar = Instance.new("ScrollingFrame")
 tabsBar.Size = UDim2.new(1, -20, 0, tabHeight)
@@ -410,17 +406,13 @@ tabsList.Padding = UDim.new(0, tabSpacing)
 tabsList.SortOrder = Enum.SortOrder.LayoutOrder
 tabsList.Parent = tabsBar
 
--- Área de contenido dinámico (Scroll vertical si hay muchos botones)
-local contentArea = Instance.new("ScrollingFrame")
-contentArea.Size = UDim2.new(1, -40, 1, -(contentY + 44))
-contentArea.Position = UDim2.fromOffset(20, contentY)
+-- Área de contenido (único frame, cambia según la pestaña)
+local contentArea = Instance.new("Frame")
+contentArea.Size = UDim2.new(1, -40, 1, -(tabY + tabHeight + 54))
+contentArea.Position = UDim2.fromOffset(20, tabY + tabHeight + 10)
 contentArea.BackgroundTransparency = 1
 contentArea.BorderSizePixel = 0
 contentArea.Parent = frame
-contentArea.ScrollBarThickness = 8
-contentArea.ScrollingDirection = Enum.ScrollingDirection.Y
-contentArea.ZIndex = 20
-contentArea.CanvasSize = UDim2.new(0, 0, 0, 0)
 contentArea.ClipsDescendants = true
 
 local contentLayout = Instance.new("UIListLayout")
@@ -428,10 +420,9 @@ contentLayout.Parent = contentArea
 contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
 contentLayout.Padding = UDim.new(0, 10)
 
--- Crear pestañas y botones
-local tabButtonToContent = {}
-local tabHeightsReal = {}
+local tabContents = {} -- [tabName] = {buttons}
 
+-- Crear pestañas y botones
 for tabName, actions in pairs(tabs) do
     local tabBtn = Instance.new("TextButton")
     tabBtn.Size = UDim2.new(0, 126, 1, -8)
@@ -444,25 +435,17 @@ for tabName, actions in pairs(tabs) do
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 10)
     table.insert(tabButtons, tabBtn)
 
-    local tabContent = Instance.new("Frame")
-    tabContent.Name = "TabContent_" .. tabName
-    tabContent.BackgroundTransparency = 1
-    tabContent.Size = UDim2.new(1, 0, 0, 0)
-    tabContent.AutomaticSize = Enum.AutomaticSize.Y
-    tabContent.Parent = contentArea
-    tabContent.Visible = false
-    tabButtonToContent[tabBtn] = tabContent
-
-    local totalBtnHeight = 0
+    local btns = {}
     for i, action in ipairs(actions) do
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, 0, 0, buttonHeight)
+        btn.Size = UDim2.new(1, 0, 0, 38)
         btn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
         btn.Text = action.Text
         btn.TextColor3 = Color3.new(1, 1, 1)
         btn.TextScaled = true
         btn.Font = Enum.Font.GothamBold
-        btn.Parent = tabContent
+        btn.Parent = contentArea
+        btn.Visible = false
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
         btn.MouseButton1Click:Connect(function()
             local ok, err = pcall(function() action.Callback(btn) end)
@@ -470,31 +453,28 @@ for tabName, actions in pairs(tabs) do
                 warn("[TurboOptimizer] Error en botón:", err)
             end
         end)
-        totalBtnHeight = totalBtnHeight + buttonHeight + 10
+        table.insert(btns, btn)
     end
-    tabHeightsReal[tabName] = math.clamp(totalBtnHeight + 24, minHeight, maxHeight)
+    tabContents[tabName] = btns
 end
 
 tabsBar.CanvasSize = UDim2.new(0, tabsList.AbsoluteContentSize.X, 1, 0)
 
--- Mostrar pestaña seleccionada y ajustar tamaño
+-- Mostrar botones de la pestaña y ajustar tamaño
 local function showTab(tabName)
-    for _, tabBtn in ipairs(tabButtons) do
-        local tabContent = tabButtonToContent[tabBtn]
-        if tabBtn.Text == tabName then
-            tabContent.Visible = true
-            contentArea.CanvasSize = UDim2.new(0, 0, 0, tabContent.AbsoluteSize.Y)
-        else
-            tabContent.Visible = false
+    for t, btns in pairs(tabContents) do
+        for _, b in ipairs(btns) do
+            b.Visible = (t == tabName)
         end
     end
-    local newHeight = tabHeightsReal[tabName] or minHeight
-    frame.Size = UDim2.fromOffset(FRAME_WIDTH, math.max(newHeight + contentY + 54, MIN_HEIGHT))
+    local count = #tabContents[tabName]
+    local newHeight = math.clamp(tabY + tabHeight + 10 + count * (38+10) + 54, MIN_HEIGHT, MAX_HEIGHT)
+    frame.Size = UDim2.fromOffset(FRAME_WIDTH, newHeight)
     closeBtn.Position = UDim2.fromOffset(FRAME_WIDTH - 40, 4)
     shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 26)
 end
 
-for _, btn in ipairs(tabButtons) do
+for i, btn in ipairs(tabButtons) do
     btn.MouseButton1Click:Connect(function()
         showTab(btn.Text)
     end)
@@ -560,4 +540,4 @@ shortcutLabel.Parent = frame
 -- Inicializar
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Plus Cargado. Atajos: U, R, N")
+print("[TurboOptimizer] Panel Fixed Cargado. Atajos: U, R, N")
