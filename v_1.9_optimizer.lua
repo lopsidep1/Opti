@@ -1,4 +1,4 @@
--- Turbo Optimizer Panel - Modern Resizable, pestañas visibles, scroll solo en Acciones, shortcuts, difuminado, bordes menos redondeados
+-- Turbo Optimizer Panel - Ultra+ con optimización extrema, scroll en todas las pestañas, opciones adicionales
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -7,6 +7,7 @@ local SoundService = game:GetService("SoundService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local Camera = Workspace.CurrentCamera
 local player = Players.LocalPlayer
 
 local FRAME_MIN_WIDTH = 380
@@ -17,7 +18,7 @@ local frameWidth = 520
 local frameHeight = 400
 local resizing = false
 
-local baseline = {Lighting = {}, Sound = {}, Guis = {}, Props = {}}
+local baseline = {Lighting = {}, Sound = {}, Guis = {}, Props = {}, Effects = {}, Camera = {}, Skybox = nil}
 local guiMain, frame, statusLabel, blackFrame, openBtn, closeBtn, memLabel, fpsLabel, shortcutLabel, shadow
 local dragEnabled = true
 local avgDt, avgFps = 1/60, 60
@@ -25,6 +26,114 @@ local currentProfile = "Medio"
 local autoMode = false
 local panelVisible = true
 
+-- ------- EXTREME OPTIMIZATION FUNCTIONS --------
+
+local function removeVisualEffects()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("SurfaceGui") or obj:IsA("BillboardGui") or obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("VideoFrame") then
+            baseline.Effects[obj] = obj.Parent
+            obj:Destroy()
+        end
+    end
+end
+
+local function reduceMeshesQuality()
+    for _, mesh in ipairs(Workspace:GetDescendants()) do
+        if mesh:IsA("MeshPart") then
+            mesh.RenderFidelity = Enum.RenderFidelity.Performance
+        end
+        if mesh:IsA("SpecialMesh") then
+            mesh.TextureId = ""
+        end
+    end
+end
+
+local function limitCameraDistance()
+    if Camera then
+        baseline.Camera.MaxDistance = Camera.MaxDistance or 1000
+        Camera.MaxDistance = 80
+        Camera.FieldOfView = 60
+    end
+end
+
+local function pauseScripts()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Script") or obj:IsA("LocalScript") then
+            if obj.Enabled == true then
+                baseline.Props[obj] = baseline.Props[obj] or {}
+                baseline.Props[obj].Enabled = true
+                obj.Enabled = false
+            end
+        end
+    end
+end
+
+local function stopAnimations()
+    for _, humanoid in ipairs(Workspace:GetDescendants()) do
+        if humanoid:IsA("Humanoid") then
+            for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+                track:Stop()
+            end
+        end
+    end
+end
+
+local function removeAmbientSounds()
+    for _, snd in ipairs(Workspace:GetDescendants()) do
+        if snd:IsA("Sound") and snd.Looped then
+            snd:Stop()
+            snd.Volume = 0
+        end
+    end
+end
+
+local function simpleSkybox()
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("Sky") then
+            baseline.Skybox = child
+            child:Destroy()
+        end
+    end
+    local sky = Instance.new("Sky")
+    sky.SkyboxBk = ""
+    sky.SkyboxDn = ""
+    sky.SkyboxFt = ""
+    sky.SkyboxLf = ""
+    sky.SkyboxRt = ""
+    sky.SkyboxUp = ""
+    sky.Parent = Lighting
+end
+
+local function compatibilityLighting()
+    baseline.Lighting.Technology = Lighting.Technology
+    Lighting.Technology = Enum.Technology.Compatibility
+    Lighting.GlobalShadows = false
+    Lighting.Brightness = 0.3
+    Lighting.OutdoorAmbient = Color3.fromRGB(70,70,70)
+end
+
+-- -------- RESTORE EXTREME OPTIMIZATIONS --------
+local function restoreExtreme()
+    -- Restore destroyed effects (not always possible if destroyed)
+    -- Restore camera distance
+    if baseline.Camera.MaxDistance then
+        Camera.MaxDistance = baseline.Camera.MaxDistance
+    end
+    if baseline.Skybox then
+        baseline.Skybox.Parent = Lighting
+    end
+    if baseline.Lighting.Technology then
+        Lighting.Technology = baseline.Lighting.Technology
+    end
+    -- Restore scripts
+    for obj, props in pairs(baseline.Props) do
+        if obj and props.Enabled ~= nil then
+            obj.Enabled = props.Enabled
+        end
+    end
+end
+
+-- --------- SNAPSHOT, RESTORE, ETC. ---------
 local function ensureSaved(obj, props)
     if not obj then return end
     baseline.Props[obj] = baseline.Props[obj] or {}
@@ -38,20 +147,11 @@ local function ensureSaved(obj, props)
 end
 
 local function snapshotAll()
+    baseline.Lighting = {}
     local L = Lighting
-    baseline.Lighting = {
-        GlobalShadows = L.GlobalShadows,
-        FogEnd = L.FogEnd,
-        EnvironmentDiffuseScale = L.EnvironmentDiffuseScale,
-        EnvironmentSpecularScale = L.EnvironmentSpecularScale,
-        Ambient = L.Ambient,
-        OutdoorAmbient = L.OutdoorAmbient,
-        Brightness = L.Brightness,
-        Technology = L.Technology,
-        ShadowSoftness = L.ShadowSoftness,
-        ColorShift_Bottom = L.ColorShift_Bottom,
-        ColorShift_Top = L.ColorShift_Top
-    }
+    for _, p in ipairs({"GlobalShadows","FogEnd","EnvironmentDiffuseScale","EnvironmentSpecularScale","Ambient","OutdoorAmbient","Brightness","Technology","ShadowSoftness","ColorShift_Bottom","ColorShift_Top"}) do
+        baseline.Lighting[p] = L[p]
+    end
     baseline.Sound = {
         AmbientReverb = SoundService.AmbientReverb,
         DistanceFactor = SoundService.DistanceFactor,
@@ -76,6 +176,7 @@ local function restoreAll()
             end
         end
     end
+    restoreExtreme()
     if blackFrame then blackFrame.Visible = false end
     statusLabel.Text = "Estado: Restaurado"
 end
@@ -343,6 +444,9 @@ handle.InputBegan:Connect(function(input)
                 tabsBar.Size = UDim2.new(1, -24, 0, tabHeight)
                 for _, f in pairs(contentFrames) do
                     f.Size = UDim2.new(1, 0, 1, 0)
+                    if f:IsA("ScrollingFrame") then
+                        f.CanvasSize = UDim2.new(0, 0, 0, f.UIListLayout.AbsoluteContentSize.Y)
+                    end
                 end
             end
         end)
@@ -454,7 +558,8 @@ shortcutLabel.Parent = frame
 local tabs = {
     ["🔄 Restaurar"] = {
         {Text = "🌀 Restaurar todo", Callback = restoreAll},
-        {Text = "🌑 Pantalla negra ON/OFF", Callback = toggleBlack}
+        {Text = "🌑 Pantalla negra ON/OFF", Callback = toggleBlack},
+        {Text = "🔙 Restaurar EXTREMO", Callback = restoreExtreme}
     },
     ["🧩 Perfiles"] = {
         {Text = "⏬ Bajo", Callback = function() applyProfile("Bajo") end},
@@ -472,9 +577,28 @@ local tabs = {
         {Text = "🖼 Ocultar GUIs decorativos", Callback = hideDecorGUIs},
         {Text = "🧱 Optimizar materiales", Callback = optimizeMaterials},
         {Text = "🛠 Optimizar físicas", Callback = optimizePhysics},
+        {Text = "🚫 Quitar efectos visuales (SurfaceGui, Decal, Texture...)", Callback = removeVisualEffects},
+        {Text = "📦 Reducir calidad de meshes y texturas", Callback = reduceMeshesQuality},
+        {Text = "🎥 Limitar distancia de cámara", Callback = limitCameraDistance},
+        {Text = "⏸ Pausar scripts secundarios", Callback = pauseScripts},
+        {Text = "🔕 Detener animaciones", Callback = stopAnimations},
+        {Text = "🔉 Eliminar sonidos ambientales", Callback = removeAmbientSounds},
+        {Text = "🌌 Skybox simple", Callback = simpleSkybox},
+        {Text = "💡 Lighting Compatibility", Callback = compatibilityLighting}
     },
-    ["🚀 Ultra+"] = {
-        {Text = "🚀 Ultra+ completo", Callback = ultraRendimiento}
+    ["🚀 Ultra++"] = {
+        {Text = "🔥 Ultra++: Optimización EXTREMA", Callback = function()
+            removeVisualEffects()
+            reduceMeshesQuality()
+            limitCameraDistance()
+            pauseScripts()
+            stopAnimations()
+            removeAmbientSounds()
+            simpleSkybox()
+            compatibilityLighting()
+            ultraRendimiento()
+            statusLabel.Text = "Estado: Ultra++ EXTREMO activado"
+        end}
     }
 }
 
@@ -513,6 +637,7 @@ contentArea.Parent = frame
 contentArea.ClipsDescendants = true
 contentArea.ZIndex = 12
 
+-- SCROLL EN TODAS LAS PESTAÑAS
 for tabName, actions in pairs(tabs) do
     local tabBtn = Instance.new("TextButton")
     tabBtn.Size = UDim2.new(0, 154, 0, tabHeight - 8)
@@ -546,102 +671,58 @@ for tabName, actions in pairs(tabs) do
     end)
     table.insert(tabButtons, tabBtn)
 
-    local contentFrame
-    if tabName == "⚙️ Acciones" then
-        contentFrame = Instance.new("ScrollingFrame")
-        contentFrame.Size = UDim2.new(1, 0, 1, 0)
-        contentFrame.Position = UDim2.new(0,0,0,0)
-        contentFrame.BackgroundTransparency = 1
-        contentFrame.BorderSizePixel = 0
-        contentFrame.ScrollBarThickness = 10
-        contentFrame.ScrollingDirection = Enum.ScrollingDirection.Y
-        contentFrame.Visible = false
-        contentFrame.ZIndex = 13
-        contentFrame.Parent = contentArea
-        local list = Instance.new("UIListLayout", contentFrame)
-        list.SortOrder = Enum.SortOrder.LayoutOrder
-        list.Padding = UDim.new(0, 12)
-        tabContents[tabName] = {}
-        contentFrames[tabName] = contentFrame
-        for _, action in ipairs(actions) do
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -8, 0, 44)
-            btn.BackgroundColor3 = Color3.fromRGB(38, 22, 80)
-            btn.Text = action.Text
-            btn.TextColor3 = Color3.fromRGB(205, 215, 255)
-            btn.TextScaled = true
-            btn.Font = Enum.Font.GothamBold
-            btn.Parent = contentFrame
-            btn.ZIndex = 14
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0.07, 6)
-            local btnGrad = Instance.new("UIGradient", btn)
-            btnGrad.Color = ColorSequence.new{
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(62, 32, 120)),
-                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(96, 38, 122)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(58, 18, 80))
-            }
-            btnGrad.Rotation = 70
-            btn.MouseEnter:Connect(function()
-                TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(120, 60, 170)}):Play()
-            end)
-            btn.MouseLeave:Connect(function()
-                TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(38, 22, 80)}):Play()
-            end)
-            btn.MouseButton1Click:Connect(function()
-                local ok, err = pcall(function() action.Callback(btn) end)
-                if not ok then
-                    warn("[TurboOptimizer] Error en botón:", err)
-                end
-            end)
-            table.insert(tabContents[tabName], btn)
-        end
-    else
-        contentFrame = Instance.new("Frame")
-        contentFrame.Size = UDim2.new(1, 0, 1, 0)
-        contentFrame.Position = UDim2.new(0, 0, 0, 0)
-        contentFrame.BackgroundTransparency = 1
-        contentFrame.BorderSizePixel = 0
-        contentFrame.Visible = false
-        contentFrame.ZIndex = 13
-        contentFrame.Parent = contentArea
-        local list = Instance.new("UIListLayout", contentFrame)
-        list.SortOrder = Enum.SortOrder.LayoutOrder
-        list.Padding = UDim.new(0, 12)
-        tabContents[tabName] = {}
-        contentFrames[tabName] = contentFrame
-        for _, action in ipairs(actions) do
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -8, 0, 44)
-            btn.BackgroundColor3 = Color3.fromRGB(38, 22, 80)
-            btn.Text = action.Text
-            btn.TextColor3 = Color3.fromRGB(205, 215, 255)
-            btn.TextScaled = true
-            btn.Font = Enum.Font.GothamBold
-            btn.Parent = contentFrame
-            btn.ZIndex = 14
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0.07, 6)
-            local btnGrad = Instance.new("UIGradient", btn)
-            btnGrad.Color = ColorSequence.new{
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(62, 32, 120)),
-                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(96, 38, 122)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(58, 18, 80))
-            }
-            btnGrad.Rotation = 70
-            btn.MouseEnter:Connect(function()
-                TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(120, 60, 170)}):Play()
-            end)
-            btn.MouseLeave:Connect(function()
-                TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(38, 22, 80)}):Play()
-            end)
-            btn.MouseButton1Click:Connect(function()
-                local ok, err = pcall(function() action.Callback(btn) end)
-                if not ok then
-                    warn("[TurboOptimizer] Error en botón:", err)
-                end
-            end)
-            table.insert(tabContents[tabName], btn)
-        end
+    local contentFrame = Instance.new("ScrollingFrame")
+    contentFrame.Size = UDim2.new(1, 0, 1, 0)
+    contentFrame.Position = UDim2.new(0,0,0,0)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.BorderSizePixel = 0
+    contentFrame.ScrollBarThickness = 10
+    contentFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+    contentFrame.Visible = false
+    contentFrame.ZIndex = 13
+    contentFrame.Parent = contentArea
+    local list = Instance.new("UIListLayout", contentFrame)
+    list.SortOrder = Enum.SortOrder.LayoutOrder
+    list.Padding = UDim.new(0, 12)
+    tabContents[tabName] = {}
+    contentFrames[tabName] = contentFrame
+    contentFrame.UIListLayout = list
+    for _, action in ipairs(actions) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -8, 0, 44)
+        btn.BackgroundColor3 = Color3.fromRGB(38, 22, 80)
+        btn.Text = action.Text
+        btn.TextColor3 = Color3.fromRGB(205, 215, 255)
+        btn.TextScaled = true
+        btn.Font = Enum.Font.GothamBold
+        btn.Parent = contentFrame
+        btn.ZIndex = 14
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0.07, 6)
+        local btnGrad = Instance.new("UIGradient", btn)
+        btnGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(62, 32, 120)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(96, 38, 122)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(58, 18, 80))
+        }
+        btnGrad.Rotation = 70
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(120, 60, 170)}):Play()
+        end)
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(38, 22, 80)}):Play()
+        end)
+        btn.MouseButton1Click:Connect(function()
+            local ok, err = pcall(function() action.Callback(btn) end)
+            if not ok then
+                warn("[TurboOptimizer] Error en botón:", err)
+            end
+        end)
+        table.insert(tabContents[tabName], btn)
     end
+    contentFrame.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y)
+    list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        contentFrame.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y)
+    end)
 end
 
 tabsBar.CanvasSize = UDim2.new(0, tabsList.AbsoluteContentSize.X, 1, 0)
@@ -728,4 +809,4 @@ end)
 
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Modern + Scroll/Resize + Atajos OK + Menos redondeado")
+print("[TurboOptimizer] Panel Ultra++ cargado con scroll en todas las pestañas y optimización extrema")
