@@ -1,4 +1,4 @@
--- Turbo Optimizer Panel - Modern Style: Dark, blue & purple, animated tabs/buttons, shadows, gradients
+-- Turbo Optimizer Panel - Modern, scroll en Acciones, panel ajustable desde las esquinas
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -9,16 +9,22 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 
+local FRAME_MIN_WIDTH = 380
+local FRAME_MIN_HEIGHT = 220
+local FRAME_MAX_WIDTH = 800
+local FRAME_MAX_HEIGHT = 700
+local frameWidth = 520
+local frameHeight = 400
+local resizing = false
+
+-- --------- FUNCIONES DE OPTIMIZADOR (igual que antes) ---------
+
 local baseline = {Lighting = {}, Sound = {}, Guis = {}, Props = {}}
 local guiMain, frame, statusLabel, blackFrame, openBtn, closeBtn, memLabel, fpsLabel, shortcutLabel, shadow
 local dragEnabled = true
 local avgDt, avgFps = 1/60, 60
 local currentProfile = "Medio"
 local autoMode = false
-
-local FRAME_WIDTH = 520
-local MIN_HEIGHT = 240
-local MAX_HEIGHT = 500
 
 local function ensureSaved(obj, props)
     if not obj then return end
@@ -216,16 +222,15 @@ local function toggleBlack()
     blackFrame.Visible = not blackFrame.Visible
 end
 
--- Main GUI
+-- GUI principal y sombra
 guiMain = Instance.new("ScreenGui")
 guiMain.Name = "TurboPanel"
 guiMain.ResetOnSpawn = false
 guiMain.IgnoreGuiInset = false
 guiMain.Parent = player:WaitForChild("PlayerGui")
 
--- Drop Shadow effect
 shadow = Instance.new("ImageLabel")
-shadow.Size = UDim2.fromOffset(FRAME_WIDTH+28, MAX_HEIGHT+44)
+shadow.Size = UDim2.fromOffset(frameWidth+28, frameHeight+44)
 shadow.Position = UDim2.fromOffset(26, 44)
 shadow.BackgroundTransparency = 1
 shadow.Image = "rbxassetid://1316045217"
@@ -235,9 +240,8 @@ shadow.ScaleType = Enum.ScaleType.Slice
 shadow.SliceCenter = Rect.new(12,12,88,88)
 shadow.Parent = guiMain
 
--- Main Panel
 frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(FRAME_WIDTH, MIN_HEIGHT)
+frame.Size = UDim2.fromOffset(frameWidth, frameHeight)
 frame.Position = UDim2.fromOffset(40, 60)
 frame.BackgroundColor3 = Color3.fromRGB(16, 20, 38)
 frame.BorderSizePixel = 0
@@ -246,7 +250,6 @@ frame.ZIndex = 1
 frame.Parent = guiMain
 local frameCorner = Instance.new("UICorner", frame)
 frameCorner.CornerRadius = UDim.new(0, 14)
-
 local gradient = Instance.new("UIGradient", frame)
 gradient.Color = ColorSequence.new{
     ColorSequenceKeypoint.new(0, Color3.fromRGB(38, 32, 60)),
@@ -267,9 +270,10 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.ZIndex = 2
 title.Parent = frame
 
+-- --------- BOTÓN DE CERRAR Y ABRIR ---------
 closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.fromOffset(34, 34)
-closeBtn.Position = UDim2.fromOffset(FRAME_WIDTH - 44, 8)
+closeBtn.Position = UDim2.fromOffset(frameWidth - 44, 8)
 closeBtn.BackgroundColor3 = Color3.fromRGB(80,30,80)
 closeBtn.Text = "❌"
 closeBtn.TextScaled = true
@@ -279,8 +283,8 @@ closeBtn.ZIndex = 5
 closeBtn.Parent = frame
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(1,0)
 closeBtn.MouseButton1Click:Connect(function()
-    TweenService:Create(frame, TweenInfo.new(0.22), {Position = UDim2.fromOffset(-FRAME_WIDTH, frame.Position.Y.Offset)}):Play()
-    TweenService:Create(shadow, TweenInfo.new(0.22), {Position = UDim2.fromOffset(-FRAME_WIDTH, shadow.Position.Y.Offset)}):Play()
+    TweenService:Create(frame, TweenInfo.new(0.22), {Position = UDim2.fromOffset(-frameWidth, frame.Position.Y.Offset)}):Play()
+    TweenService:Create(shadow, TweenInfo.new(0.22), {Position = UDim2.fromOffset(-frameWidth, shadow.Position.Y.Offset)}):Play()
     wait(0.23)
     frame.Visible = false
     shadow.Visible = false
@@ -307,7 +311,54 @@ openBtn.MouseButton1Click:Connect(function()
     openBtn.Visible = false
 end)
 
--- Drag panel
+-- --------- PANEL REDIMENSIONABLE ---------
+local handle = Instance.new("Frame")
+handle.Size = UDim2.fromOffset(18, 18)
+handle.Position = UDim2.new(1, -18, 1, -18)
+handle.BackgroundColor3 = Color3.fromRGB(80, 40, 120)
+handle.BorderSizePixel = 0
+handle.ZIndex = 20
+handle.Parent = frame
+Instance.new("UICorner", handle).CornerRadius = UDim.new(1,0)
+local handleIcon = Instance.new("ImageLabel", handle)
+handleIcon.Size = UDim2.fromScale(1, 1)
+handleIcon.BackgroundTransparency = 1
+handleIcon.Image = "rbxassetid://6015418713" -- corner resize icon
+handleIcon.ImageColor3 = Color3.fromRGB(200, 180, 255)
+
+handle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        resizing = true
+        local startMouse = UserInputService:GetMouseLocation()
+        local startSize = frame.Size
+        local startPos = frame.Position
+        local cam = workspace.CurrentCamera
+        local viewport = cam and cam.ViewportSize or Vector2.new(1920,1080)
+        local con; con = UserInputService.InputChanged:Connect(function(inp)
+            if resizing and inp.UserInputType == Enum.UserInputType.MouseMovement then
+                local mouse = UserInputService:GetMouseLocation()
+                local delta = mouse - startMouse
+                frameWidth = math.clamp(startSize.X.Offset + delta.X, FRAME_MIN_WIDTH, FRAME_MAX_WIDTH)
+                frameHeight = math.clamp(startSize.Y.Offset + delta.Y, FRAME_MIN_HEIGHT, FRAME_MAX_HEIGHT)
+                frame.Size = UDim2.fromOffset(frameWidth, frameHeight)
+                shadow.Size = UDim2.fromOffset(frameWidth+28, frameHeight+44)
+                closeBtn.Position = UDim2.fromOffset(frameWidth - 44, 8)
+                handle.Position = UDim2.new(1, -18, 1, -18)
+                shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 28)
+                tabsBar.Size = UDim2.new(1, -24, 0, tabHeight)
+                contentArea.Size = UDim2.new(1, -44, 1, -(tabY + tabHeight + 56))
+            end
+        end)
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                resizing = false
+                if con then con:Disconnect() end
+            end
+        end)
+    end
+end)
+
+-- --------- DRAG PANEL ---------
 local dragging, dragStart, startPos
 local function clampToViewport(x, y)
     local cam = workspace.CurrentCamera
@@ -359,6 +410,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
+-- --------- LABELS Y CONTADORES ---------
 statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -10, 0, 22)
 statusLabel.Position = UDim2.fromOffset(8, 46)
@@ -396,14 +448,14 @@ shortcutLabel = Instance.new("TextLabel")
 shortcutLabel.Size = UDim2.new(1, -20, 0, 20)
 shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 28)
 shortcutLabel.BackgroundTransparency = 1
-shortcutLabel.Text = "Atajos: U=Ultra+ | R=Restaurar | N=Negro | Panel arrastrable"
+shortcutLabel.Text = "Atajos: U=Ultra+ | R=Restaurar | N=Negro | Panel arrastrable | Esquina: ajustar tamaño"
 shortcutLabel.TextScaled = true
 shortcutLabel.Font = Enum.Font.Gotham
 shortcutLabel.TextColor3 = Color3.fromRGB(170, 140, 255)
 shortcutLabel.ZIndex = 5
 shortcutLabel.Parent = frame
 
--- Tabs scroll horizontal + área de contenido dinámico
+-- --------- TABS Y CONTENIDO ---------
 local tabs = {
     ["🔄 Restaurar"] = {
         {Text = "🌀 Restaurar todo", Callback = restoreAll},
@@ -424,7 +476,8 @@ local tabs = {
         {Text = "🌫 Limpiar partículas", Callback = clearParticles},
         {Text = "🖼 Ocultar GUIs decorativos", Callback = hideDecorGUIs},
         {Text = "🧱 Optimizar materiales", Callback = optimizeMaterials},
-        {Text = "🛠 Optimizar físicas", Callback = optimizePhysics}
+        {Text = "🛠 Optimizar físicas", Callback = optimizePhysics},
+        -- Puedes agregar más opciones aquí si lo deseas
     },
     ["🚀 Ultra+"] = {
         {Text = "🚀 Ultra+ completo", Callback = ultraRendimiento}
@@ -455,21 +508,9 @@ tabsList.Parent = tabsBar
 
 local tabButtons = {}
 local tabContents = {}
+local contentFrames = {}
 
-local contentArea = Instance.new("Frame")
-contentArea.Size = UDim2.new(1, -44, 1, -(tabY + tabHeight + 56))
-contentArea.Position = UDim2.fromOffset(22, tabY + tabHeight + 12)
-contentArea.BackgroundTransparency = 1
-contentArea.BorderSizePixel = 0
-contentArea.Parent = frame
-contentArea.ClipsDescendants = true
-contentArea.ZIndex = 9
-
-local contentLayout = Instance.new("UIListLayout")
-contentLayout.Parent = contentArea
-contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-contentLayout.Padding = UDim.new(0, 12)
-
+-- Crea cada pestaña y su frame de contenido
 for tabName, actions in pairs(tabs) do
     local tabBtn = Instance.new("TextButton")
     tabBtn.Size = UDim2.new(0, 154, 0, tabHeight - 8)
@@ -491,7 +532,6 @@ for tabName, actions in pairs(tabs) do
         ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 18, 80))
     }
     grad.Rotation = 90
-    -- Hover effect
     tabBtn.MouseEnter:Connect(function()
         TweenService:Create(tabBtn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(80, 90, 210)}):Play()
     end)
@@ -502,59 +542,111 @@ for tabName, actions in pairs(tabs) do
     end)
     table.insert(tabButtons, tabBtn)
 
-    local btns = {}
-    for i, action in ipairs(actions) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, 0, 0, 44)
-        btn.BackgroundColor3 = Color3.fromRGB(38, 22, 80)
-        btn.Text = action.Text
-        btn.TextColor3 = Color3.fromRGB(205, 215, 255)
-        btn.TextScaled = true
-        btn.Font = Enum.Font.GothamBold
-        btn.Parent = contentArea
-        btn.Visible = false
-        btn.ZIndex = 10
-        local btnCorner = Instance.new("UICorner", btn)
-        btnCorner.CornerRadius = UDim.new(0, 12)
-        local btnGrad = Instance.new("UIGradient", btn)
-        btnGrad.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(62, 32, 120)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(96, 38, 122)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(58, 18, 80))
-        }
-        btnGrad.Rotation = 70
-        -- Hover effect
-        btn.MouseEnter:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(120, 60, 170)}):Play()
-        end)
-        btn.MouseLeave:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(38, 22, 80)}):Play()
-        end)
-        btn.MouseButton1Click:Connect(function()
-            local ok, err = pcall(function() action.Callback(btn) end)
-            if not ok then
-                warn("[TurboOptimizer] Error en botón:", err)
-            end
-        end)
-        table.insert(btns, btn)
+    -- Si es la pestaña Acciones, usa un ScrollFrame vertical para los botones
+    local contentFrame
+    if tabName == "⚙️ Acciones" then
+        contentFrame = Instance.new("ScrollingFrame")
+        contentFrame.Size = UDim2.new(1, 0, 1, 0)
+        contentFrame.Position = UDim2.new(0,0,0,0)
+        contentFrame.BackgroundTransparency = 1
+        contentFrame.BorderSizePixel = 0
+        contentFrame.ScrollBarThickness = 10
+        contentFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+        contentFrame.Visible = false
+        contentFrame.ZIndex = 10
+        contentFrame.Parent = contentArea
+        local list = Instance.new("UIListLayout", contentFrame)
+        list.SortOrder = Enum.SortOrder.LayoutOrder
+        list.Padding = UDim.new(0, 12)
+        tabContents[tabName] = {}
+        contentFrames[tabName] = contentFrame
+        for _, action in ipairs(actions) do
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -8, 0, 44)
+            btn.BackgroundColor3 = Color3.fromRGB(38, 22, 80)
+            btn.Text = action.Text
+            btn.TextColor3 = Color3.fromRGB(205, 215, 255)
+            btn.TextScaled = true
+            btn.Font = Enum.Font.GothamBold
+            btn.Parent = contentFrame
+            btn.ZIndex = 11
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+            local btnGrad = Instance.new("UIGradient", btn)
+            btnGrad.Color = ColorSequence.new{
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(62, 32, 120)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(96, 38, 122)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(58, 18, 80))
+            }
+            btnGrad.Rotation = 70
+            btn.MouseEnter:Connect(function()
+                TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(120, 60, 170)}):Play()
+            end)
+            btn.MouseLeave:Connect(function()
+                TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(38, 22, 80)}):Play()
+            end)
+            btn.MouseButton1Click:Connect(function()
+                local ok, err = pcall(function() action.Callback(btn) end)
+                if not ok then
+                    warn("[TurboOptimizer] Error en botón:", err)
+                end
+            end)
+            table.insert(tabContents[tabName], btn)
+        end
+    else -- Las demás pestañas (no necesitan scroll vertical)
+        contentFrame = Instance.new("Frame")
+        contentFrame.Size = UDim2.new(1, 0, 1, 0)
+        contentFrame.Position = UDim2.new(0, 0, 0, 0)
+        contentFrame.BackgroundTransparency = 1
+        contentFrame.BorderSizePixel = 0
+        contentFrame.Visible = false
+        contentFrame.ZIndex = 10
+        contentFrame.Parent = contentArea
+        local list = Instance.new("UIListLayout", contentFrame)
+        list.SortOrder = Enum.SortOrder.LayoutOrder
+        list.Padding = UDim.new(0, 12)
+        tabContents[tabName] = {}
+        contentFrames[tabName] = contentFrame
+        for _, action in ipairs(actions) do
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -8, 0, 44)
+            btn.BackgroundColor3 = Color3.fromRGB(38, 22, 80)
+            btn.Text = action.Text
+            btn.TextColor3 = Color3.fromRGB(205, 215, 255)
+            btn.TextScaled = true
+            btn.Font = Enum.Font.GothamBold
+            btn.Parent = contentFrame
+            btn.ZIndex = 11
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+            local btnGrad = Instance.new("UIGradient", btn)
+            btnGrad.Color = ColorSequence.new{
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(62, 32, 120)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(96, 38, 122)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(58, 18, 80))
+            }
+            btnGrad.Rotation = 70
+            btn.MouseEnter:Connect(function()
+                TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(120, 60, 170)}):Play()
+            end)
+            btn.MouseLeave:Connect(function()
+                TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(38, 22, 80)}):Play()
+            end)
+            btn.MouseButton1Click:Connect(function()
+                local ok, err = pcall(function() action.Callback(btn) end)
+                if not ok then
+                    warn("[TurboOptimizer] Error en botón:", err)
+                end
+            end)
+            table.insert(tabContents[tabName], btn)
+        end
     end
-    tabContents[tabName] = btns
 end
 
 tabsBar.CanvasSize = UDim2.new(0, tabsList.AbsoluteContentSize.X, 1, 0)
 
 local function showTab(tabName)
-    for t, btns in pairs(tabContents) do
-        for _, b in ipairs(btns) do
-            b.Visible = (t == tabName)
-        end
+    for name, frameObj in pairs(contentFrames) do
+        frameObj.Visible = (name == tabName)
     end
-    local count = #tabContents[tabName]
-    local newHeight = math.clamp(tabY + tabHeight + 12 + count * (44+12) + 56, MIN_HEIGHT, MAX_HEIGHT)
-    frame.Size = UDim2.fromOffset(FRAME_WIDTH, newHeight)
-    shadow.Size = UDim2.fromOffset(FRAME_WIDTH+28, newHeight+44)
-    closeBtn.Position = UDim2.fromOffset(FRAME_WIDTH - 44, 8)
-    shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 28)
     for _, btn in ipairs(tabButtons) do
         TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(42, 50, 130)}):Play()
     end
@@ -572,6 +664,7 @@ for i, btn in ipairs(tabButtons) do
 end
 showTab(tabButtons[1].Text)
 
+-- --------- FPS/MEM/ATJOS ---------
 RunService.RenderStepped:Connect(function(dt)
     if fpsLabel and memLabel then
         avgDt = avgDt + (dt - avgDt) * 0.15
@@ -618,4 +711,4 @@ end)
 
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Modern Cargado. Atajos: U, R, N")
+print("[TurboOptimizer] Panel Modern + Scroll/Resize cargado. Atajos: U, R, N")
