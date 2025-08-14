@@ -1,4 +1,4 @@
--- Turbo Optimizer Panel - Modern Resizable, pestañas visibles, scroll, shortcuts, difuminado, bordes menos redondeados
+-- Turbo Optimizer Panel - Modern Resizable, pestañas visibles, scroll solo en Acciones, shortcuts, difuminado, bordes menos redondeados
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -232,8 +232,8 @@ shadow = Instance.new("ImageLabel")
 shadow.Size = UDim2.fromOffset(frameWidth+48, frameHeight+64)
 shadow.Position = UDim2.fromOffset(20, 40)
 shadow.BackgroundTransparency = 1
-shadow.Image = "rbxassetid://5616351187" -- sombra difuminada
-shadow.ImageColor3 = Color3.fromRGB(50, 50, 80) -- más difuminado/más claro
+shadow.Image = "rbxassetid://5616351187"
+shadow.ImageColor3 = Color3.fromRGB(50, 50, 80)
 shadow.ImageTransparency = 0.35
 shadow.ZIndex = 0
 shadow.ScaleType = Enum.ScaleType.Slice
@@ -249,7 +249,7 @@ frame.Active = true
 frame.ZIndex = 1
 frame.Parent = guiMain
 local frameCorner = Instance.new("UICorner", frame)
-frameCorner.CornerRadius = UDim.new(0.07, 6) -- Menos redondeado
+frameCorner.CornerRadius = UDim.new(0.07, 6)
 local gradient = Instance.new("UIGradient", frame)
 gradient.Color = ColorSequence.new{
     ColorSequenceKeypoint.new(0, Color3.fromRGB(38, 32, 60)),
@@ -491,7 +491,7 @@ tabsBar.ScrollBarThickness = 8
 tabsBar.ScrollingDirection = Enum.ScrollingDirection.X
 tabsBar.BorderSizePixel = 0
 tabsBar.ZIndex = 8
-tabsBar.CanvasSize = UDim2.new(0, 0, 1, 0)
+tabsBar.CanvasSize = UDim2.new(0, tabsBar.AbsoluteSize.X, 1, 0)
 tabsBar.ClipsDescendants = true
 
 local tabsList = Instance.new("UIListLayout")
