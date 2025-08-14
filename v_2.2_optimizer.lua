@@ -1,4 +1,5 @@
 -- TURBO OPTIMIZER PANEL - ULTRA++ VERSION ESTABLE CON CONTADORES Y SCROLL
+-- Fix: UIListLayout access is now done via FindFirstChildOfClass, never contentFrame.UIListLayout
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -28,7 +29,6 @@ local panelVisible = true
 local fpsNow, fpsSum, fpsMin, fpsMax, fpsCount = 60, 0, 60, 60, 0
 
 -- -------- EXTREME OPTIMIZATION FUNCTIONS --------
-
 local function removeVisualEffects()
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("SurfaceGui") or obj:IsA("BillboardGui") or obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("VideoFrame") then
@@ -439,8 +439,11 @@ handle.InputBegan:Connect(function(input)
                 tabsBar.Size = UDim2.new(1, -24, 0, tabHeight)
                 for _, f in pairs(contentFrames) do
                     f.Size = UDim2.new(1, 0, 1, 0)
-                    if f:IsA("ScrollingFrame") and f.UIListLayout then
-                        f.CanvasSize = UDim2.new(0, 0, 0, f.UIListLayout.AbsoluteContentSize.Y)
+                    if f:IsA("ScrollingFrame") then
+                        local list = f:FindFirstChildOfClass("UIListLayout")
+                        if list then
+                            f.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y)
+                        end
                     end
                 end
             end
@@ -713,7 +716,6 @@ for tabName, actions in pairs(tabs) do
     list.Padding = UDim.new(0, 12)
     tabContents[tabName] = {}
     contentFrames[tabName] = contentFrame
-    contentFrame.UIListLayout = list
     for _, action in ipairs(actions) do
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, -8, 0, 44)
