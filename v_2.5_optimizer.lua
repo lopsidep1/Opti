@@ -1,4 +1,4 @@
--- TURBO OPTIMIZER PANEL - Ultra y Ultra++ por separado, contadores adaptativos y FPS promedio en los últimos 10 segundos, con latencia de red
+-- TURBO OPTIMIZER PANEL - Ultra y Ultra++ por separado, contadores adaptativos al ancho del GUI y FPS promedio últimos 10s
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -32,6 +32,11 @@ local fpsBufferMaxTime = 10  -- segundos
 local fpsBufferStartTime = tick()
 local fpsMin, fpsMax = 60, 60
 local pingNow = 0
+
+local blackFrame = nil
+local statusLabel, shortcutLabel, frame, shadow, openBtn, closeBtn, handle
+local countersFrame
+local tabButtons, tabContents, contentFrames = {}, {}, {}
 
 -- -------- OPTIMIZACIONES --------
 local function ensureSaved(obj, props)
@@ -328,7 +333,7 @@ openBtn.MouseButton1Click:Connect(function()
     openBtn.Visible = false
 end)
 
-local handle = Instance.new("Frame")
+handle = Instance.new("Frame")
 handle.Size = UDim2.fromOffset(22, 22)
 handle.Position = UDim2.new(1, -22, 1, -22)
 handle.BackgroundColor3 = Color3.fromRGB(80, 40, 120)
@@ -342,8 +347,7 @@ handleIcon.BackgroundTransparency = 1
 handleIcon.Image = "rbxassetid://6015418713"
 handleIcon.ImageColor3 = Color3.fromRGB(200, 180, 255)
 
--- Contadores (adaptativos)
-local statusLabel = Instance.new("TextLabel")
+statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -10, 0, 22)
 statusLabel.Position = UDim2.fromOffset(8, 46)
 statusLabel.BackgroundTransparency = 1
@@ -354,7 +358,7 @@ statusLabel.TextColor3 = Color3.fromRGB(210, 170, 255)
 statusLabel.ZIndex = 2
 statusLabel.Parent = frame
 
-local countersFrame = Instance.new("Frame")
+countersFrame = Instance.new("Frame")
 countersFrame.Name = "CountersFrame"
 countersFrame.BackgroundTransparency = 1
 countersFrame.Size = UDim2.new(1, -24, 0, 26)
@@ -368,9 +372,10 @@ countersLayout.Padding = UDim.new(0,8)
 countersLayout.SortOrder = Enum.SortOrder.LayoutOrder
 countersLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
+local counterLabels = {}
+
 local function mkCounter(text, color)
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0, 110, 1, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
     lbl.TextScaled = true
@@ -378,6 +383,7 @@ local function mkCounter(text, color)
     lbl.TextColor3 = color
     lbl.ZIndex = 2
     lbl.Parent = countersFrame
+    table.insert(counterLabels, lbl)
     return lbl
 end
 
@@ -388,7 +394,7 @@ local fpsMaxLabel   = mkCounter("FPS Max: ...", Color3.fromRGB(120, 255, 120))
 local pingLabel     = mkCounter("Ping: ...", Color3.fromRGB(200, 220, 120))
 local memLabel      = mkCounter("Mem: ...", Color3.fromRGB(120, 180, 255))
 
-local shortcutLabel = Instance.new("TextLabel")
+shortcutLabel = Instance.new("TextLabel")
 shortcutLabel.Size = UDim2.new(1, -20, 0, 20)
 shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 28)
 shortcutLabel.BackgroundTransparency = 1
@@ -398,6 +404,17 @@ shortcutLabel.Font = Enum.Font.Gotham
 shortcutLabel.TextColor3 = Color3.fromRGB(170, 140, 255)
 shortcutLabel.ZIndex = 5
 shortcutLabel.Parent = frame
+
+-- Resize dinámico de contadores
+local function resizeCounters()
+    local n = #counterLabels
+    for i, lbl in ipairs(counterLabels) do
+        lbl.Size = UDim2.new(1/n, -8, 1, 0)
+    end
+end
+resizeCounters()
+frame:GetPropertyChangedSignal("Size"):Connect(resizeCounters)
+countersFrame:GetPropertyChangedSignal("Size"):Connect(resizeCounters)
 
 -- TABS y contenido
 local tabs = {
@@ -448,9 +465,9 @@ tabsList.Padding = UDim.new(0, tabSpacing)
 tabsList.SortOrder = Enum.SortOrder.LayoutOrder
 tabsList.Parent = tabsBar
 
-local tabButtons = {}
-local tabContents = {}
-local contentFrames = {}
+tabButtons = {}
+tabContents = {}
+contentFrames = {}
 
 local contentArea = Instance.new("Frame")
 contentArea.Size = UDim2.new(1, 0, 1, -(tabY + tabHeight + 44))
@@ -593,6 +610,7 @@ handle.InputBegan:Connect(function(input)
                 shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 28)
                 tabsBar.Size = UDim2.new(1, -24, 0, tabHeight)
                 countersFrame.Size = UDim2.new(1, -24, 0, math.max(26, math.floor(frameHeight/18)))
+                resizeCounters()
                 for _, f in pairs(contentFrames) do
                     f.Size = UDim2.new(1, 0, 1, 0)
                     if f:IsA("ScrollingFrame") then
@@ -736,4 +754,4 @@ end)
 
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Ultra y Ultra++ adaptativo. FPS avg últimos 10s. Ping y contadores ajustados.")
+print("[TurboOptimizer] Panel Ultra y Ultra++ adaptativo. FPS avg últimos 10s. Ping y contadores ajustados. Contadores nunca se salen del GUI.")
