@@ -1,4 +1,4 @@
--- TURBO OPTIMIZER PANEL - ULTRA y ULTRA++ por separado, contadores adaptativos y latencia de red (ms)
+-- TURBO OPTIMIZER PANEL - Ultra y Ultra++ por separado, contadores adaptativos y FPS promedio en los últimos 10 segundos, con latencia de red
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -25,8 +25,12 @@ local currentProfile = "Medio"
 local autoMode = false
 local panelVisible = true
 
--- Contadores
-local fpsNow, fpsSum, fpsMin, fpsMax, fpsCount = 60, 0, 60, 60, 0
+-- FPS, Ping, Memoria adaptativos
+local fpsNow = 60
+local fpsBuffer = {}
+local fpsBufferMaxTime = 10  -- segundos
+local fpsBufferStartTime = tick()
+local fpsMin, fpsMax = 60, 60
 local pingNow = 0
 
 -- -------- OPTIMIZACIONES --------
@@ -142,34 +146,19 @@ local function ultraRendimiento()
 end
 
 local function ultraRendimientoPlus()
-    -- Ultra + visuales + meshes + scripts + skybox + lighting + animaciones + sonidos
     ultraRendimiento()
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("SurfaceGui") or obj:IsA("BillboardGui") or obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("VideoFrame") then
             obj:Destroy()
         end
-        if obj:IsA("MeshPart") then
-            obj.RenderFidelity = Enum.RenderFidelity.Performance
-        end
-        if obj:IsA("SpecialMesh") then
-            obj.TextureId = ""
-        end
-        if obj:IsA("Script") or obj:IsA("LocalScript") then
-            if obj.Enabled == true then obj.Enabled = false end
-        end
-        if obj:IsA("Humanoid") then
-            for _, track in ipairs(obj:GetPlayingAnimationTracks()) do track:Stop() end
-        end
-        if obj:IsA("Sound") and obj.Looped then
-            obj:Stop()
-            obj.Volume = 0
-        end
+        if obj:IsA("MeshPart") then obj.RenderFidelity = Enum.RenderFidelity.Performance end
+        if obj:IsA("SpecialMesh") then obj.TextureId = "" end
+        if obj:IsA("Script") or obj:IsA("LocalScript") then if obj.Enabled == true then obj.Enabled = false end end
+        if obj:IsA("Humanoid") then for _, track in ipairs(obj:GetPlayingAnimationTracks()) do track:Stop() end end
+        if obj:IsA("Sound") and obj.Looped then obj:Stop(); obj.Volume = 0 end
     end
-    for _, child in ipairs(Lighting:GetChildren()) do
-        if child:IsA("Sky") then child:Destroy() end
-    end
-    local sky = Instance.new("Sky")
-    sky.Parent = Lighting
+    for _, child in ipairs(Lighting:GetChildren()) do if child:IsA("Sky") then child:Destroy() end end
+    local sky = Instance.new("Sky"); sky.Parent = Lighting
     Lighting.Technology = Enum.Technology.Compatibility
     Lighting.GlobalShadows = false
     Lighting.Brightness = 0.3
@@ -393,7 +382,7 @@ local function mkCounter(text, color)
 end
 
 local fpsLabel      = mkCounter("FPS: ...", Color3.fromRGB(100, 255, 200))
-local fpsAvgLabel   = mkCounter("FPS Avg: ...", Color3.fromRGB(120, 200, 255))
+local fpsAvgLabel   = mkCounter("FPS Avg(10s): ...", Color3.fromRGB(120, 200, 255))
 local fpsMinLabel   = mkCounter("FPS Min: ...", Color3.fromRGB(255, 120, 120))
 local fpsMaxLabel   = mkCounter("FPS Max: ...", Color3.fromRGB(120, 255, 120))
 local pingLabel     = mkCounter("Ping: ...", Color3.fromRGB(200, 220, 120))
@@ -675,11 +664,29 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- FPS/Contadores/Ping
+-- FPS/Contadores/Ping (FPS promedio últimos 10s)
 RunService.RenderStepped:Connect(function(dt)
     fpsNow = math.round(1/dt)
-    fpsSum = fpsSum + fpsNow
-    fpsCount = fpsCount + 1
+    local nowTime = tick()
+
+    -- Limpiar buffer viejo (más de 10s atrás)
+    table.insert(fpsBuffer, {t=nowTime, v=fpsNow})
+    local i = 1
+    while i <= #fpsBuffer do
+        if nowTime - fpsBuffer[i].t > fpsBufferMaxTime then
+            table.remove(fpsBuffer, i)
+        else
+            i = i + 1
+        end
+    end
+    -- FPS promedio últimos 10s
+    local avg10 = 0
+    if #fpsBuffer > 0 then
+        local sum = 0
+        for _, v in ipairs(fpsBuffer) do sum = sum + v.v end
+        avg10 = math.floor(sum / #fpsBuffer)
+    end
+
     fpsMin = math.min(fpsMin, fpsNow)
     fpsMax = math.max(fpsMax, fpsNow)
     local netPing = 0
@@ -694,7 +701,7 @@ RunService.RenderStepped:Connect(function(dt)
     end
     pingNow = netPing
     fpsLabel.Text = "FPS: " .. fpsNow
-    fpsAvgLabel.Text = ("FPS Avg: %d"):format(fpsCount > 0 and math.floor(fpsSum/fpsCount) or fpsNow)
+    fpsAvgLabel.Text = ("FPS Avg(10s): %d"):format(avg10)
     fpsMinLabel.Text = ("FPS Min: %d"):format(fpsMin)
     fpsMaxLabel.Text = ("FPS Max: %d"):format(fpsMax)
     pingLabel.Text = ("Ping: %d ms"):format(pingNow)
@@ -729,4 +736,4 @@ end)
 
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Ultra y Ultra++ por separado, contadores adaptativos y ping funcionando.")
+print("[TurboOptimizer] Panel Ultra y Ultra++ adaptativo. FPS avg últimos 10s. Ping y contadores ajustados.")
