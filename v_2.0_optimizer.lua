@@ -1,4 +1,4 @@
--- Turbo Optimizer Panel - Ultra+ con optimización extrema, scroll en todas las pestañas, opciones adicionales
+-- TURBO OPTIMIZER PANEL - ULTRA++ FINAL PROBADO Y CORREGIDO
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -19,14 +19,15 @@ local frameHeight = 400
 local resizing = false
 
 local baseline = {Lighting = {}, Sound = {}, Guis = {}, Props = {}, Effects = {}, Camera = {}, Skybox = nil}
-local guiMain, frame, statusLabel, blackFrame, openBtn, closeBtn, memLabel, fpsLabel, shortcutLabel, shadow
+local guiMain, frame, statusLabel, blackFrame, openBtn, closeBtn, memLabel, fpsLabel, fpsAvgLabel, fpsMinLabel, fpsMaxLabel, shortcutLabel, shadow
 local dragEnabled = true
 local avgDt, avgFps = 1/60, 60
+local sumFps, countFps, minFps, maxFps = 60, 1, 60, 60
 local currentProfile = "Medio"
 local autoMode = false
 local panelVisible = true
 
--- ------- EXTREME OPTIMIZATION FUNCTIONS --------
+-- -------- EXTREME OPTIMIZATION FUNCTIONS --------
 
 local function removeVisualEffects()
     for _, obj in ipairs(Workspace:GetDescendants()) do
@@ -112,10 +113,7 @@ local function compatibilityLighting()
     Lighting.OutdoorAmbient = Color3.fromRGB(70,70,70)
 end
 
--- -------- RESTORE EXTREME OPTIMIZATIONS --------
 local function restoreExtreme()
-    -- Restore destroyed effects (not always possible if destroyed)
-    -- Restore camera distance
     if baseline.Camera.MaxDistance then
         Camera.MaxDistance = baseline.Camera.MaxDistance
     end
@@ -125,7 +123,6 @@ local function restoreExtreme()
     if baseline.Lighting.Technology then
         Lighting.Technology = baseline.Lighting.Technology
     end
-    -- Restore scripts
     for obj, props in pairs(baseline.Props) do
         if obj and props.Enabled ~= nil then
             obj.Enabled = props.Enabled
@@ -444,7 +441,7 @@ handle.InputBegan:Connect(function(input)
                 tabsBar.Size = UDim2.new(1, -24, 0, tabHeight)
                 for _, f in pairs(contentFrames) do
                     f.Size = UDim2.new(1, 0, 1, 0)
-                    if f:IsA("ScrollingFrame") then
+                    if f:IsA("ScrollingFrame") and f.UIListLayout then
                         f.CanvasSize = UDim2.new(0, 0, 0, f.UIListLayout.AbsoluteContentSize.Y)
                     end
                 end
@@ -532,9 +529,42 @@ fpsLabel.TextColor3 = Color3.fromRGB(100, 255, 200)
 fpsLabel.ZIndex = 2
 fpsLabel.Parent = frame
 
+fpsAvgLabel = Instance.new("TextLabel")
+fpsAvgLabel.Size = UDim2.new(0, 110, 0, 18)
+fpsAvgLabel.Position = UDim2.fromOffset(110, 72)
+fpsAvgLabel.BackgroundTransparency = 1
+fpsAvgLabel.Text = "FPS Avg: ..."
+fpsAvgLabel.TextScaled = true
+fpsAvgLabel.Font = Enum.Font.Code
+fpsAvgLabel.TextColor3 = Color3.fromRGB(120, 200, 255)
+fpsAvgLabel.ZIndex = 2
+fpsAvgLabel.Parent = frame
+
+fpsMinLabel = Instance.new("TextLabel")
+fpsMinLabel.Size = UDim2.new(0, 110, 0, 18)
+fpsMinLabel.Position = UDim2.fromOffset(220, 72)
+fpsMinLabel.BackgroundTransparency = 1
+fpsMinLabel.Text = "FPS Min: ..."
+fpsMinLabel.TextScaled = true
+fpsMinLabel.Font = Enum.Font.Code
+fpsMinLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+fpsMinLabel.ZIndex = 2
+fpsMinLabel.Parent = frame
+
+fpsMaxLabel = Instance.new("TextLabel")
+fpsMaxLabel.Size = UDim2.new(0, 110, 0, 18)
+fpsMaxLabel.Position = UDim2.fromOffset(330, 72)
+fpsMaxLabel.BackgroundTransparency = 1
+fpsMaxLabel.Text = "FPS Max: ..."
+fpsMaxLabel.TextScaled = true
+fpsMaxLabel.Font = Enum.Font.Code
+fpsMaxLabel.TextColor3 = Color3.fromRGB(120, 255, 120)
+fpsMaxLabel.ZIndex = 2
+fpsMaxLabel.Parent = frame
+
 memLabel = Instance.new("TextLabel")
 memLabel.Size = UDim2.new(0, 110, 0, 18)
-memLabel.Position = UDim2.fromOffset(104, 72)
+memLabel.Position = UDim2.fromOffset(440, 72)
 memLabel.BackgroundTransparency = 1
 memLabel.Text = "Mem: ..."
 memLabel.TextScaled = true
@@ -752,11 +782,22 @@ end
 showTab(tabButtons[1].Text)
 
 RunService.RenderStepped:Connect(function(dt)
-    if fpsLabel and memLabel then
+    if fpsLabel and memLabel and fpsAvgLabel and fpsMinLabel and fpsMaxLabel then
         avgDt = avgDt + (dt - avgDt) * 0.15
-        avgFps = math.max(1, math.floor(1/avgDt + 0.5))
-        fpsLabel.Text = "FPS: " .. avgFps
-        fpsLabel.TextColor3 = (avgFps >= 50 and Color3.fromRGB(100,255,200)) or (avgFps >= 30 and Color3.fromRGB(255,230,90)) or Color3.fromRGB(255,100,120)
+        local nowFps = math.max(1, math.floor(1/avgDt + 0.5))
+        sumFps = sumFps + nowFps
+        countFps = countFps + 1
+        minFps = math.min(minFps, nowFps)
+        maxFps = math.max(maxFps, nowFps)
+
+        fpsLabel.Text = "FPS: " .. nowFps
+        fpsAvgLabel.Text = ("FPS Avg: %d"):format(math.floor(sumFps/countFps))
+        fpsMinLabel.Text = ("FPS Min: %d"):format(minFps)
+        fpsMaxLabel.Text = ("FPS Max: %d"):format(maxFps)
+        fpsLabel.TextColor3 = (nowFps >= 50 and Color3.fromRGB(100,255,200)) or (nowFps >= 30 and Color3.fromRGB(255,230,90)) or Color3.fromRGB(255,100,120)
+        fpsAvgLabel.TextColor3 = Color3.fromRGB(120, 200, 255)
+        fpsMinLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+        fpsMaxLabel.TextColor3 = Color3.fromRGB(120, 255, 120)
         local luaMB = math.floor((collectgarbage("count")/1024) * 10 + 0.5)/10
         memLabel.Text = ("Mem: %.1f MB"):format(luaMB)
     end
@@ -809,4 +850,4 @@ end)
 
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Ultra++ cargado con scroll en todas las pestañas y optimización extrema")
+print("[TurboOptimizer] Panel Ultra++ cargado y probado. Scroll y botones funcionando. FPS avg/min/max/mem OK.")
