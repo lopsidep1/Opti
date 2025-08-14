@@ -1,4 +1,4 @@
--- Turbo Optimizer Panel - Modern Resizable, pestañas visibles, scroll, shortcuts, difuminado, bordes redondeados
+-- Turbo Optimizer Panel - Modern Resizable, pestañas visibles, scroll, shortcuts, difuminado, bordes menos redondeados
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -249,7 +249,7 @@ frame.Active = true
 frame.ZIndex = 1
 frame.Parent = guiMain
 local frameCorner = Instance.new("UICorner", frame)
-frameCorner.CornerRadius = UDim.new(0.18, 10) -- más redondeado
+frameCorner.CornerRadius = UDim.new(0.07, 6) -- Menos redondeado
 local gradient = Instance.new("UIGradient", frame)
 gradient.Color = ColorSequence.new{
     ColorSequenceKeypoint.new(0, Color3.fromRGB(38, 32, 60)),
@@ -280,7 +280,7 @@ closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextColor3 = Color3.new(1,1,1)
 closeBtn.ZIndex = 5
 closeBtn.Parent = frame
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(1,0)
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0.07, 6)
 closeBtn.MouseButton1Click:Connect(function()
     panelVisible = false
     frame.Visible = false
@@ -299,7 +299,7 @@ openBtn.TextColor3 = Color3.new(1,1,1)
 openBtn.Parent = guiMain
 openBtn.Visible = false
 openBtn.ZIndex = 10
-Instance.new("UICorner", openBtn).CornerRadius = UDim.new(1,0)
+Instance.new("UICorner", openBtn).CornerRadius = UDim.new(0.07, 6)
 openBtn.MouseButton1Click:Connect(function()
     panelVisible = true
     frame.Visible = true
@@ -307,7 +307,6 @@ openBtn.MouseButton1Click:Connect(function()
     openBtn.Visible = false
 end)
 
--- Esquina inferior derecha para redimensionar
 local handle = Instance.new("Frame")
 handle.Size = UDim2.fromOffset(22, 22)
 handle.Position = UDim2.new(1, -22, 1, -22)
@@ -315,7 +314,7 @@ handle.BackgroundColor3 = Color3.fromRGB(80, 40, 120)
 handle.BorderSizePixel = 0
 handle.ZIndex = 20
 handle.Parent = frame
-Instance.new("UICorner", handle).CornerRadius = UDim.new(1,0)
+Instance.new("UICorner", handle).CornerRadius = UDim.new(0.07, 6)
 local handleIcon = Instance.new("ImageLabel", handle)
 handleIcon.Size = UDim2.fromScale(1, 1)
 handleIcon.BackgroundTransparency = 1
@@ -356,7 +355,6 @@ handle.InputBegan:Connect(function(input)
     end
 end)
 
--- Drag panel
 local dragging, dragStart, startPos
 local function clampToViewport(x, y)
     local cam = workspace.CurrentCamera
@@ -445,7 +443,7 @@ shortcutLabel = Instance.new("TextLabel")
 shortcutLabel.Size = UDim2.new(1, -20, 0, 20)
 shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 28)
 shortcutLabel.BackgroundTransparency = 1
-shortcutLabel.Text = "Atajos: U=Ultra+ | R=Restaurar | N=Negro | F1=Panel | B=Negro | Panel arrastrable/esquina"
+shortcutLabel.Text = "Atajos: U=Ultra+ | R=Restaurar | N/B=Negro | F1=Panel | Panel arrastrable/esquina"
 shortcutLabel.TextScaled = true
 shortcutLabel.Font = Enum.Font.Gotham
 shortcutLabel.TextColor3 = Color3.fromRGB(170, 140, 255)
@@ -474,7 +472,6 @@ local tabs = {
         {Text = "🖼 Ocultar GUIs decorativos", Callback = hideDecorGUIs},
         {Text = "🧱 Optimizar materiales", Callback = optimizeMaterials},
         {Text = "🛠 Optimizar físicas", Callback = optimizePhysics},
-        -- Puedes agregar más opciones aquí si lo deseas
     },
     ["🚀 Ultra+"] = {
         {Text = "🚀 Ultra+ completo", Callback = ultraRendimiento}
@@ -529,7 +526,7 @@ for tabName, actions in pairs(tabs) do
     tabBtn.BorderSizePixel = 0
     tabBtn.ZIndex = 10
     local corner = Instance.new("UICorner", tabBtn)
-    corner.CornerRadius = UDim.new(0.18, 10)
+    corner.CornerRadius = UDim.new(0.07, 6)
     local grad = Instance.new("UIGradient", tabBtn)
     grad.Color = ColorSequence.new{
         ColorSequenceKeypoint.new(0, Color3.fromRGB(42, 50, 130)),
@@ -576,7 +573,7 @@ for tabName, actions in pairs(tabs) do
             btn.Font = Enum.Font.GothamBold
             btn.Parent = contentFrame
             btn.ZIndex = 14
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0.18, 10)
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0.07, 6)
             local btnGrad = Instance.new("UIGradient", btn)
             btnGrad.Color = ColorSequence.new{
                 ColorSequenceKeypoint.new(0, Color3.fromRGB(62, 32, 120)),
@@ -622,7 +619,7 @@ for tabName, actions in pairs(tabs) do
             btn.Font = Enum.Font.GothamBold
             btn.Parent = contentFrame
             btn.ZIndex = 14
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0.18, 10)
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0.07, 6)
             local btnGrad = Instance.new("UIGradient", btn)
             btnGrad.Color = ColorSequence.new{
                 ColorSequenceKeypoint.new(0, Color3.fromRGB(62, 32, 120)),
@@ -731,4 +728,4 @@ end)
 
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Modern + Scroll/Resize + Atajos OK")
+print("[TurboOptimizer] Panel Modern + Scroll/Resize + Atajos OK + Menos redondeado")
