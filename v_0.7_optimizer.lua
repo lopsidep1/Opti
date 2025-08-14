@@ -1,26 +1,21 @@
--- Turbo Optimizer Minimal GUI v1.0
--- Solo contiene las pestañas y botones pedidos (Optimizar, Reversión, Avanzado)
--- Extras: Arrastre libre, Atajos U/R/N, Auto Mode
-
--- Servicios básicos
+-- Turbo Optimizer Panel v2.0 - Tabs: Perfiles, Acciones, Ultra+, Restaurar
+-- Servicios
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local SoundService = game:GetService("SoundService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-
 local player = Players.LocalPlayer
-local baseline = {Lighting = {}, Sound = {}, Guis = {}, Props = {}}
-local guiMain, frame, statusLabel
-local dragEnabled = true
-local autoMode = false
-local currentProfile = "Medio"
-local avgDt = 1/60
-local avgFps = 60
-local blackFrame, openBtn
 
--- Guardar y restaurar estado original
+local baseline = {Lighting = {}, Sound = {}, Guis = {}, Props = {}}
+local guiMain, frame, statusLabel, blackFrame, openBtn
+local dragEnabled = true
+local avgDt, avgFps = 1/60, 60
+local currentProfile = "Medio"
+local autoMode = false
+
+-- Estado original
 local function ensureSaved(obj, props)
     if not obj then return end
     baseline.Props[obj] = baseline.Props[obj] or {}
@@ -76,7 +71,7 @@ local function restoreAll()
     statusLabel.Text = "Estado: Restaurado"
 end
 
--- Perfilar (Bajo/Medio/Alto)
+-- Perfiles
 local function applyProfile(name)
     currentProfile = name
     local L = Lighting
@@ -101,10 +96,10 @@ local function applyProfile(name)
         L.OutdoorAmbient = Color3.new(0.1, 0.1, 0.1)
         L.Brightness = 0.5
     end
-    statusLabel.Text = ("Estado: Activo (%s%s)"):format(name, autoMode and " - Auto" or "")
+    statusLabel.Text = ("Estado: Perfil %s%s"):format(name, autoMode and " (Auto)" or "")
 end
 
--- Ultra+ Optimización máxima
+-- Ultra+
 local function ultraRendimiento()
     applyProfile("Alto")
     -- Silenciar sonidos
@@ -147,27 +142,13 @@ local function ultraRendimiento()
     statusLabel.Text = "Estado: Ultra+ activado"
 end
 
--- Avanzado
-local function hideDecorGUIs()
-    for g, _ in pairs(baseline.Guis) do
-        if g and g ~= guiMain then
-            ensureSaved(g, {"Enabled"})
-            g.Enabled = false
-        end
-    end
-end
-
-local function optimizeMaterials()
-    for _, part in ipairs(Workspace:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if part.Material == Enum.Material.Neon or part.Material == Enum.Material.Glass then
-                ensureSaved(part, {"Material"})
-                part.Material = Enum.Material.SmoothPlastic
-            end
-        end
-        if part:IsA("MeshPart") then
-            ensureSaved(part, {"RenderFidelity"})
-            pcall(function() part.RenderFidelity = Enum.RenderFidelity.Performance end)
+-- Acciones
+local function muteAll()
+    for _, s in ipairs(Workspace:GetDescendants()) do
+        if s:IsA("Sound") then
+            ensureSaved(s, {"Volume", "Playing"})
+            s.Volume = 0
+            s.Playing = false
         end
     end
 end
@@ -192,17 +173,41 @@ local function clearParticles()
     end
 end
 
-local function muteAll()
-    for _, s in ipairs(Workspace:GetDescendants()) do
-        if s:IsA("Sound") then
-            ensureSaved(s, {"Volume", "Playing"})
-            s.Volume = 0
-            s.Playing = false
+local function hideDecorGUIs()
+    for g, _ in pairs(baseline.Guis) do
+        if g and g ~= guiMain then
+            ensureSaved(g, {"Enabled"})
+            g.Enabled = false
         end
     end
 end
 
--- Pantalla negra ON/OFF
+local function optimizeMaterials()
+    for _, part in ipairs(Workspace:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if part.Material == Enum.Material.Neon or part.Material == Enum.Material.Glass then
+                ensureSaved(part, {"Material"})
+                part.Material = Enum.Material.SmoothPlastic
+            end
+        end
+        if part:IsA("MeshPart") then
+            ensureSaved(part, {"RenderFidelity"})
+            pcall(function() part.RenderFidelity = Enum.RenderFidelity.Performance end)
+        end
+    end
+end
+
+local function optimizePhysics()
+    for _, part in ipairs(Workspace:GetDescendants()) do
+        if part:IsA("BasePart") then
+            ensureSaved(part, {"Anchored", "CanCollide"})
+            part.Anchored = true
+            part.CanCollide = false
+        end
+    end
+end
+
+-- Pantalla negra
 local function toggleBlack()
     if not blackFrame then
         blackFrame = Instance.new("Frame")
@@ -222,9 +227,11 @@ guiMain.ResetOnSpawn = false
 guiMain.IgnoreGuiInset = false
 guiMain.Parent = player:WaitForChild("PlayerGui")
 
-local FRAME_WIDTH = 420
+local FRAME_WIDTH = 480
+local FRAME_HEIGHT = 340
+
 frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(FRAME_WIDTH, 340)
+frame.Size = UDim2.fromOffset(FRAME_WIDTH, FRAME_HEIGHT)
 frame.Position = UDim2.fromOffset(40, 60)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 frame.BorderSizePixel = 0
@@ -236,7 +243,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 32)
 title.Position = UDim2.fromOffset(0, 0)
 title.BackgroundTransparency = 1
-title.Text = "Turbo Optimizer Minimal"
+title.Text = "Turbo Optimizer Panel"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.TextSize = 20
 title.Font = Enum.Font.GothamBold
@@ -336,36 +343,43 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Tabs y botones
+-- Tabs y botones - Fila superior
 local tabs = {
-    ["🟦 Optimizar"] = {
-        {Text = "Ultra+", Callback = ultraRendimiento},
-        {Text = "Perfil: Bajo", Callback = function() applyProfile("Bajo") end},
-        {Text = "Perfil: Medio", Callback = function() applyProfile("Medio") end},
-        {Text = "Perfil: Alto", Callback = function() applyProfile("Alto") end}
+    ["🔄 Restaurar"] = {
+        {Text = "Restaurar todo", Callback = restoreAll},
+        {Text = "Pantalla negra ON/OFF", Callback = toggleBlack}
     },
-    ["🟨 Reversión"] = {
-        {Text = "Restaurar Todo", Callback = restoreAll},
-        {Text = "Mostrar/Ocultar Negro", Callback = toggleBlack}
+    ["🧩 Perfiles"] = {
+        {Text = "Bajo", Callback = function() applyProfile("Bajo") end},
+        {Text = "Medio", Callback = function() applyProfile("Medio") end},
+        {Text = "Alto", Callback = function() applyProfile("Alto") end},
+        {Text = "Auto", Callback = function()
+            autoMode = not autoMode
+            statusLabel.Text = "Estado: Perfil Auto " .. (autoMode and "ON" or "OFF")
+        end}
     },
-    ["🟩 Avanzado"] = {
-        {Text = "Ocultar GUIs decorativos", Callback = hideDecorGUIs},
-        {Text = "Optimizar materiales", Callback = optimizeMaterials},
+    ["⚙️ Acciones"] = {
+        {Text = "Silenciar sonidos", Callback = muteAll},
         {Text = "Optimizar luces", Callback = optimizeLights},
         {Text = "Limpiar partículas", Callback = clearParticles},
-        {Text = "Silenciar sonidos", Callback = muteAll}
+        {Text = "Ocultar GUIs decorativos", Callback = hideDecorGUIs},
+        {Text = "Optimizar materiales", Callback = optimizeMaterials},
+        {Text = "Optimizar físicas", Callback = optimizePhysics}
+    },
+    ["🚀 Ultra+"] = {
+        {Text = "Ultra+ completo", Callback = ultraRendimiento}
     }
 }
 
 local tabButtons, tabFrames = {}, {}
 local tabY = 72
-local tabHeight = 32
-local tabSpacing = 6
+local tabHeight = 36
+local tabSpacing = 8
 local contentY = tabY + tabHeight + 10
-local buttonHeight = 34
+local buttonHeight = 36
 
 local tabsBar = Instance.new("Frame")
-tabsBar.Size = UDim2.new(1, -20, 0, tabHeight + 10)
+tabsBar.Size = UDim2.new(1, -20, 0, tabHeight + 8)
 tabsBar.Position = UDim2.fromOffset(10, tabY)
 tabsBar.BackgroundTransparency = 1
 tabsBar.Parent = frame
@@ -379,7 +393,7 @@ tabsList.Parent = tabsBar
 
 for tabName, actions in pairs(tabs) do
     local tabBtn = Instance.new("TextButton")
-    tabBtn.Size = UDim2.new(0, 120, 1, -10)
+    tabBtn.Size = UDim2.new(0, 120, 1, -8)
     tabBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
     tabBtn.Text = tabName
     tabBtn.TextColor3 = Color3.new(1, 1, 1)
@@ -390,7 +404,7 @@ for tabName, actions in pairs(tabs) do
     table.insert(tabButtons, tabBtn)
 
     local tabFrame = Instance.new("Frame")
-    tabFrame.Size = UDim2.new(1, -20, 1, -contentY - 10)
+    tabFrame.Size = UDim2.new(1, -20, 1, -(contentY + 10))
     tabFrame.Position = UDim2.fromOffset(10, contentY)
     tabFrame.BackgroundTransparency = 1
     tabFrame.Visible = false
@@ -400,7 +414,7 @@ for tabName, actions in pairs(tabs) do
     for i, action in ipairs(actions) do
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, 0, 0, buttonHeight)
-        btn.Position = UDim2.fromOffset(0, (i - 1) * (buttonHeight + 6))
+        btn.Position = UDim2.fromOffset(0, (i - 1) * (buttonHeight + 8))
         btn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
         btn.Text = action.Text
         btn.TextColor3 = Color3.new(1, 1, 1)
@@ -435,19 +449,7 @@ RunService.RenderStepped:Connect(function(dt)
     avgFps = math.max(1, math.floor(1/avgDt + 0.5))
 end)
 
--- Atajos de teclado
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == Enum.KeyCode.U then
-        ultraRendimiento()
-    elseif input.KeyCode == Enum.KeyCode.R then
-        restoreAll()
-    elseif input.KeyCode == Enum.KeyCode.N then
-        toggleBlack()
-    end
-end)
-
--- Auto Mode
+-- Auto Mode: cambia perfil según FPS cada segundo
 task.spawn(function()
     local lastApplied = currentProfile
     while guiMain.Parent do
@@ -470,20 +472,16 @@ task.spawn(function()
     end
 end)
 
--- Botón auto mode
-local autoBtn = Instance.new("TextButton")
-autoBtn.Size = UDim2.new(0, 140, 0, 28)
-autoBtn.Position = UDim2.fromOffset(FRAME_WIDTH-150, 36)
-autoBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 120)
-autoBtn.Text = "Auto Mode: OFF"
-autoBtn.TextScaled = true
-autoBtn.Font = Enum.Font.GothamBold
-autoBtn.TextColor3 = Color3.new(1,1,1)
-autoBtn.Parent = frame
-Instance.new("UICorner", autoBtn).CornerRadius = UDim.new(0, 8)
-autoBtn.MouseButton1Click:Connect(function()
-    autoMode = not autoMode
-    autoBtn.Text = "Auto Mode: " .. (autoMode and "ON" or "OFF")
+-- Atajos de teclado
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.U then
+        ultraRendimiento()
+    elseif input.KeyCode == Enum.KeyCode.R then
+        restoreAll()
+    elseif input.KeyCode == Enum.KeyCode.N then
+        toggleBlack()
+    end
 end)
 
 -- Info de atajos
@@ -500,4 +498,4 @@ shortcutLabel.Parent = frame
 -- Inicializar
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Minimal Cargado. Atajos: U, R, N")
+print("[TurboOptimizer] Panel Tabs Cargado. Atajos: U, R, N")
