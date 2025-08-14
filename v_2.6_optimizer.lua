@@ -1,3 +1,6 @@
+-- MiScript.lua
+local version = "2.6"
+
 -- TURBO OPTIMIZER PANEL - Ultra y Ultra++ por separado, contadores adaptativos al ancho del GUI y FPS promedio últimos 10s
 
 local Players = game:GetService("Players")
