@@ -1,4 +1,4 @@
--- Turbo Optimizer Panel - FPS y Mem en tiempo real, label atajos abajo siempre visible
+-- Turbo Optimizer Panel - Pestañas totalmente visibles, FPS/Mem/Atajos funcionando
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -392,17 +392,16 @@ local tabs = {
     }
 }
 
-local tabButtons = {}
 local tabY = 88
-local tabHeight = 36
-local tabSpacing = 8
+local tabHeight = 44
+local tabSpacing = 10
 
 local tabsBar = Instance.new("ScrollingFrame")
 tabsBar.Size = UDim2.new(1, -20, 0, tabHeight)
 tabsBar.Position = UDim2.fromOffset(10, tabY)
-tabsBar.BackgroundColor3 = Color3.fromRGB(20,20,30)
+tabsBar.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
 tabsBar.Parent = frame
-tabsBar.ScrollBarThickness = 6
+tabsBar.ScrollBarThickness = 8
 tabsBar.ScrollingDirection = Enum.ScrollingDirection.X
 tabsBar.BorderSizePixel = 0
 tabsBar.ZIndex = 10
@@ -415,7 +414,9 @@ tabsList.Padding = UDim.new(0, tabSpacing)
 tabsList.SortOrder = Enum.SortOrder.LayoutOrder
 tabsList.Parent = tabsBar
 
--- Área de contenido (único frame, cambia según la pestaña)
+local tabButtons = {}
+local tabContents = {}
+
 local contentArea = Instance.new("Frame")
 contentArea.Size = UDim2.new(1, -40, 1, -(tabY + tabHeight + 54))
 contentArea.Position = UDim2.fromOffset(20, tabY + tabHeight + 10)
@@ -429,18 +430,20 @@ contentLayout.Parent = contentArea
 contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
 contentLayout.Padding = UDim.new(0, 10)
 
-local tabContents = {}
-
 for tabName, actions in pairs(tabs) do
     local tabBtn = Instance.new("TextButton")
-    tabBtn.Size = UDim2.new(0, 126, 1, -8)
-    tabBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+    tabBtn.Size = UDim2.new(0, 140, 0, tabHeight - 8)
+    tabBtn.BackgroundColor3 = Color3.fromRGB(85, 105, 175)
     tabBtn.Text = tabName
     tabBtn.TextColor3 = Color3.new(1, 1, 1)
     tabBtn.TextScaled = true
-    tabBtn.Font = Enum.Font.Gotham
+    tabBtn.Font = Enum.Font.GothamBold
     tabBtn.Parent = tabsBar
-    Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 10)
+    tabBtn.AutoButtonColor = true
+    tabBtn.BorderSizePixel = 0
+    tabBtn.ZIndex = 11
+    local corner = Instance.new("UICorner", tabBtn)
+    corner.CornerRadius = UDim.new(0, 12)
     table.insert(tabButtons, tabBtn)
 
     local btns = {}
@@ -479,6 +482,15 @@ local function showTab(tabName)
     frame.Size = UDim2.fromOffset(FRAME_WIDTH, newHeight)
     closeBtn.Position = UDim2.fromOffset(FRAME_WIDTH - 40, 4)
     shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 26)
+    for _, btn in ipairs(tabButtons) do
+        btn.BackgroundColor3 = Color3.fromRGB(85, 105, 175)
+    end
+    -- Resalta la pestaña activa
+    for i, btn in ipairs(tabButtons) do
+        if btn.Text == tabName then
+            btn.BackgroundColor3 = Color3.fromRGB(175, 205, 255)
+        end
+    end
 end
 
 for i, btn in ipairs(tabButtons) do
@@ -534,4 +546,4 @@ end)
 
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel FPS/Mem Fixed Cargado. Atajos: U, R, N")
+print("[TurboOptimizer] Panel TabsVisible Cargado. Atajos: U, R, N")
