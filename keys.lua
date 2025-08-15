@@ -1,32 +1,69 @@
--- Serviços
+-- SERVIDOR: Sistema de Key con reporte de errores a Discord (poner en ServerScriptService)
+
 local Players = game:GetService("Players")
-local StarterGui = game:GetService("StarterGui")
-local UserInputService = game:GetService("UserInputService")
-local player = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+
+-- Cambia esto a tu Webhook real de Discord
+local webhookUrl = "https://discord.com/api/webhooks/1405789222249431191/bx9Dga9EjAFYH6vYXtm8T9sxj2r21hpn-GL5blCxS0u9SVOJ59qoYaYLT4t9lyTa_Zlb"
 
 local usedKeys = {}
 
--- Função de validação de formato da key (exemplo com prefixo FREE_)
+-- Validación de key (prefijo FREE_)
 local function isValidKeyFormat(key)
     return string.match(key, "^FREE_%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w$") ~= nil
 end
 
--- Notificação
-local function notify(title, text, duration)
-    StarterGui:SetCore("SendNotification", {
-        Title = title,
-        Text = text,
-        Duration = duration or 4
-    })
+-- Reporte de error a Discord
+local function sendDiscordErrorLog(playerName, key, motivo)
+    local content = string.format("🚨 [KeySystem] Error:\nJugador: **%s**\nKey: `%s`\nMotivo: %s", playerName, key, motivo)
+    local data = {["content"] = content}
+    local body = HttpService:JSONEncode(data)
+    local success, err = pcall(function()
+        HttpService:PostAsync(webhookUrl, body, Enum.HttpContentType.ApplicationJson, false)
+    end)
+    if not success then
+        warn("No se pudo enviar el error a Discord: " .. tostring(err))
+    end
 end
 
--- Criar GUI
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+-- Evento remoto para validación de key
+local remote = Instance.new("RemoteFunction")
+remote.Name = "CheckKeyRemote"
+remote.Parent = game.ReplicatedStorage
+
+remote.OnServerInvoke = function(player, key)
+    if not isValidKeyFormat(key) then
+        sendDiscordErrorLog(player.Name, key, "Formato inválido")
+        return false, "Formato da key incorreto."
+    end
+    if usedKeys[key] then
+        sendDiscordErrorLog(player.Name, key, "Key ya usada")
+        return false, "Essa key já foi usada."
+    end
+
+    usedKeys[key] = true
+    return true, "Key aceita! Bem-vindo."
+end
+
+-- CLIENTE: Interfaz gráfica para ingresar la key (poner en StarterPlayerScripts como LocalScript)
+
+--[[
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local player = Players.LocalPlayer
+
+local remote = ReplicatedStorage:WaitForChild("CheckKeyRemote")
+
+-- Crear GUI
+local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "JeffKeySystem"
+ScreenGui.Parent = game:GetService("CoreGui")
 
 local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0, 300, 0, 230)
-Frame.Position = UDim2.new(0.5, -150, 0.5, -115)
+Frame.Size = UDim2.new(0, 300, 0, 200)
+Frame.Position = UDim2.new(0.5, -150, 0.5, -100)
 Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 Frame.BorderSizePixel = 0
 Frame.Active = true
@@ -43,7 +80,7 @@ Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 20
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
--- Botão Fechar
+-- Botón Fechar
 local CloseBtn = Instance.new("TextButton", Frame)
 CloseBtn.Text = "X"
 CloseBtn.Size = UDim2.new(0, 30, 0, 30)
@@ -62,112 +99,43 @@ end)
 local TextBox = Instance.new("TextBox", Frame)
 TextBox.PlaceholderText = "Digite sua key aqui..."
 TextBox.Size = UDim2.new(0.9, 0, 0, 40)
-TextBox.Position = UDim2.new(0.05, 0, 0.25, 0)
+TextBox.Position = UDim2.new(0.05, 0, 0.3, 0)
 TextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 TextBox.TextColor3 = Color3.new(1, 1, 1)
-TextBox.Text = ""
-TextBox.ClearTextOnFocus = false
 TextBox.Font = Enum.Font.SourceSans
 TextBox.TextSize = 18
 Instance.new("UICorner", TextBox)
 
--- Label de mensagem
-local message = Instance.new("TextLabel", Frame)
-message.Size = UDim2.new(0.9, 0, 0, 30)
-message.Position = UDim2.new(0.05, 0, 0.55, 0)
-message.BackgroundTransparency = 1
-message.TextColor3 = Color3.new(1, 1, 1)
-message.Font = Enum.Font.SourceSansItalic
-message.TextSize = 16
-message.Text = ""
+-- Botão de enviar
+local SendBtn = Instance.new("TextButton", Frame)
+SendBtn.Text = "Enviar"
+SendBtn.Size = UDim2.new(0.5, -10, 0, 35)
+SendBtn.Position = UDim2.new(0.25, 0, 0.65, 0)
+SendBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+SendBtn.TextColor3 = Color3.new(1, 1, 1)
+SendBtn.Font = Enum.Font.SourceSansBold
+SendBtn.TextSize = 18
+Instance.new("UICorner", SendBtn)
 
--- Botão Verificar Key
-local VerifyBtn = Instance.new("TextButton", Frame)
-VerifyBtn.Text = "Verificar Key"
-VerifyBtn.Size = UDim2.new(0.45, 0, 0, 30)
-VerifyBtn.Position = UDim2.new(0.05, 0, 0.75, 0)
-VerifyBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-VerifyBtn.TextColor3 = Color3.new(1, 1, 1)
-VerifyBtn.Font = Enum.Font.SourceSans
-VerifyBtn.TextSize = 16
-Instance.new("UICorner", VerifyBtn)
+local function notify(title, text, duration)
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = title,
+        Text = text,
+        Duration = duration or 4
+    })
+end
 
--- Botão Get Key
-local GetBtn = Instance.new("TextButton", Frame)
-GetBtn.Text = "Get Key"
-GetBtn.Size = UDim2.new(0.45, 0, 0, 30)
-GetBtn.Position = UDim2.new(0.5, 0, 0.75, 0)
-GetBtn.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
-GetBtn.TextColor3 = Color3.new(1, 1, 1)
-GetBtn.Font = Enum.Font.SourceSans
-GetBtn.TextSize = 16
-Instance.new("UICorner", GetBtn)
-
--- Arrastar janela
-local dragging, dragInput, mousePos, framePos
-
-Frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        mousePos = input.Position
-        framePos = Frame.Position
-
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
+SendBtn.MouseButton1Click:Connect(function()
+    local key = TextBox.Text
+    local success, msg = remote:InvokeServer(key)
+    if success then
+        notify("Sucesso", msg, 4)
+        ScreenGui:Destroy()
+    else
+        notify("Erro", msg, 4)
     end
 end)
 
-Frame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInput = input
-    end
-end)
+]]
 
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - mousePos
-        Frame.Position = UDim2.new(
-            framePos.X.Scale,
-            framePos.X.Offset + delta.X,
-            framePos.Y.Scale,
-            framePos.Y.Offset + delta.Y
-        )
-    end
-end)
-
--- Ação do botão Get Key
-GetBtn.MouseButton1Click:Connect(function()
-    setclipboard("https://09451251-ce7c-4b85-9888-3ccad0870dd4-00-1zbdtwvn428t0.worf.replit.dev")
-    notify("🔗 Link Copiado", "Acesse o site para gerar sua key.", 3)
-end)
-
--- Ação do botão Verificar Key
-VerifyBtn.MouseButton1Click:Connect(function()
-    local inputKey = TextBox.Text:upper()
-
-    if not isValidKeyFormat(inputKey) then
-        message.Text = "❌ Formato de key inválido."
-        notify("Erro", "Formato da key inválido!", 4)
-        return
-    end
-
-    if usedKeys[inputKey] then
-        message.Text = "❌ Essa key já foi usada! Use outra."
-        notify("Erro", "❌ Essa key é repetida. Use outra!", 5)
-        return
-    end
-
-    usedKeys[inputKey] = true
-    message.Text = "✅ Key correta! Você entrou na whitelist."
-    notify("Sucesso", "✅ Key correta! Dando whitelist...", 5)
-
-    -- Aqui você executa a função liberada após validação
-    -- Exemplo:
-    -- print("Usuário autorizado:", player.Name)
-
-    wait(1)
-    ScreenGui:Destroy()
-end)
+-- Fin del script completo
