@@ -1,50 +1,3 @@
--- SERVIDOR: Sistema de Key con reporte de errores a Discord (poner en ServerScriptService)
-
-local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
-
--- Cambia esto a tu Webhook real de Discord
-local webhookUrl = "https://discord.com/api/webhooks/1405789222249431191/bx9Dga9EjAFYH6vYXtm8T9sxj2r21hpn-GL5blCxS0u9SVOJ59qoYaYLT4t9lyTa_Zlb"
-
-local usedKeys = {}
-
--- Validación de key (prefijo FREE_)
-local function isValidKeyFormat(key)
-    return string.match(key, "^FREE_%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w%w$") ~= nil
-end
-
--- Reporte de error a Discord
-local function sendDiscordErrorLog(playerName, key, motivo)
-    local content = string.format("🚨 [KeySystem] Error:\nJugador: **%s**\nKey: `%s`\nMotivo: %s", playerName, key, motivo)
-    local data = {["content"] = content}
-    local body = HttpService:JSONEncode(data)
-    local success, err = pcall(function()
-        HttpService:PostAsync(webhookUrl, body, Enum.HttpContentType.ApplicationJson, false)
-    end)
-    if not success then
-        warn("No se pudo enviar el error a Discord: " .. tostring(err))
-    end
-end
-
--- Evento remoto para validación de key
-local remote = Instance.new("RemoteFunction")
-remote.Name = "CheckKeyRemote"
-remote.Parent = game.ReplicatedStorage
-
-remote.OnServerInvoke = function(player, key)
-    if not isValidKeyFormat(key) then
-        sendDiscordErrorLog(player.Name, key, "Formato inválido")
-        return false, "Formato da key incorreto."
-    end
-    if usedKeys[key] then
-        sendDiscordErrorLog(player.Name, key, "Key ya usada")
-        return false, "Essa key já foi usada."
-    end
-
-    usedKeys[key] = true
-    return true, "Key aceita! Bem-vindo."
-end
-
 -- CLIENTE: Interfaz gráfica para ingresar la key (poner en StarterPlayerScripts como LocalScript)
 
 --[[
@@ -137,5 +90,3 @@ SendBtn.MouseButton1Click:Connect(function()
 end)
 
 ]]
-
--- Fin del script completo
