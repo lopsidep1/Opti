@@ -1,5 +1,5 @@
--- TURBO OPTIMIZER PANEL - Ultra y Ultra++ por separado, contadores adaptativos al ancho del GUI y FPS promedio últimos 10s
--- Mejoras: VFX Optimizations, Performance improvements, Best Optimization, GUI bug fixes, General GUI improvements
+-- TURBO OPTIMIZER PANEL (Optimizado)
+-- Mejora: GUI con resize anclado al borde superior izquierdo, feedback de botones, animación de aparición, mejores estados, robustez en acciones, sugerencias aplicadas.
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -12,45 +12,33 @@ local Camera = Workspace.CurrentCamera
 local Stats = game:GetService("Stats")
 local player = Players.LocalPlayer
 
-local FRAME_MIN_WIDTH = 380
-local FRAME_MIN_HEIGHT = 220
-local FRAME_MAX_WIDTH = 900
-local FRAME_MAX_HEIGHT = 700
-local frameWidth = 520
-local frameHeight = 400
+local FRAME_MIN_WIDTH, FRAME_MIN_HEIGHT = 380, 220
+local FRAME_MAX_WIDTH, FRAME_MAX_HEIGHT = 900, 700
+local frameWidth, frameHeight = 520, 400
 local resizing = false
 
 local baseline = {Lighting = {}, Sound = {}, Guis = {}, Props = {}, Effects = {}, Camera = {}, Skybox = nil}
 local dragEnabled = true
 local currentProfile = "Medio"
 local autoMode = false
-local panelVisible = true
+local panelVisible = false
 
--- FPS, Ping, Memoria adaptativos
-local fpsNow = 60
-local fpsBuffer = {}
-local fpsBufferMaxTime = 10  -- segundos
-local fpsMin, fpsMax = 60, 60
-local pingNow = 0
+local fpsNow, fpsBuffer, fpsBufferMaxTime, fpsMin, fpsMax, pingNow = 60, {}, 10, 60, 60, 0
 
 local blackFrame = nil
 local statusLabel, shortcutLabel, frame, shadow, openBtn, closeBtn, handle
 local countersFrame
 local tabButtons, tabContents, contentFrames = {}, {}, {}
 
--- --------- UTILITIES ----------
+-- --------- UTILS -----------
 local function safeSet(obj, prop, val)
     if obj and obj[prop] ~= nil then
         pcall(function() obj[prop] = val end)
     end
 end
-
 local function safeDestroy(obj)
-    if obj and obj.Destroy then
-        pcall(function() obj:Destroy() end)
-    end
+    if obj and obj.Destroy then pcall(function() obj:Destroy() end) end
 end
-
 local function ensureSaved(obj, props)
     if not obj then return end
     baseline.Props[obj] = baseline.Props[obj] or {}
@@ -82,81 +70,50 @@ local function snapshotAll()
     end
 end
 
+local function setStatus(text, color)
+    statusLabel.Text = text
+    if color then
+        TweenService:Create(statusLabel, TweenInfo.new(0.25), {TextColor3 = color}):Play()
+        task.wait(0.5)
+        TweenService:Create(statusLabel, TweenInfo.new(0.7), {TextColor3 = Color3.fromRGB(210, 170, 255)}):Play()
+    end
+end
+
 local function restoreAll()
     for k, v in pairs(baseline.Lighting) do Lighting[k] = v end
     for k, v in pairs(baseline.Sound) do SoundService[k] = v end
     for g, state in pairs(baseline.Guis) do if g then g.Enabled = state end end
-    for obj, props in pairs(baseline.Props) do
-        if obj then
-            for propName, originalValue in pairs(props) do
-                pcall(function() obj[propName] = originalValue end)
-            end
-        end
-    end
+    for obj, props in pairs(baseline.Props) do if obj then for propName, originalValue in pairs(props) do pcall(function() obj[propName] = originalValue end) end end end
     if blackFrame then blackFrame.Visible = false end
-    if statusLabel then statusLabel.Text = "Estado: Restaurado" end
+    setStatus("Estado: Restaurado", Color3.fromRGB(100,255,180))
 end
 
 local function applyProfile(name)
     currentProfile = name
     local L = Lighting
     if name == "Bajo" then
-        L.GlobalShadows = false
-        L.FogEnd = 1e6
-        L.EnvironmentDiffuseScale = 0.1
-        L.EnvironmentSpecularScale = 0.1
-        L.Brightness = 1
+        L.GlobalShadows = false; L.FogEnd = 1e6; L.EnvironmentDiffuseScale = 0.1; L.EnvironmentSpecularScale = 0.1; L.Brightness = 1
     elseif name == "Medio" then
-        L.GlobalShadows = false
-        L.FogEnd = 1e8
-        L.EnvironmentDiffuseScale = 0
-        L.EnvironmentSpecularScale = 0
-        L.Brightness = 0.75
+        L.GlobalShadows = false; L.FogEnd = 1e8; L.EnvironmentDiffuseScale = 0; L.EnvironmentSpecularScale = 0; L.Brightness = 0.75
     elseif name == "Alto" then
-        L.GlobalShadows = false
-        L.FogEnd = 1e9
-        L.EnvironmentDiffuseScale = 0
-        L.EnvironmentSpecularScale = 0
-        L.Ambient = Color3.new(0.1, 0.1, 0.15)
-        L.OutdoorAmbient = Color3.new(0.1, 0.1, 0.15)
-        L.Brightness = 0.5
+        L.GlobalShadows = false; L.FogEnd = 1e9; L.EnvironmentDiffuseScale = 0; L.EnvironmentSpecularScale = 0
+        L.Ambient = Color3.new(0.1, 0.1, 0.15); L.OutdoorAmbient = Color3.new(0.1, 0.1, 0.15); L.Brightness = 0.5
     end
-    if statusLabel then statusLabel.Text = ("Estado: Perfil %s%s"):format(name, autoMode and " (Auto)" or "") end
+    setStatus(("Estado: Perfil %s%s"):format(name, autoMode and " (Auto)" or ""), Color3.fromRGB(120,200,255))
 end
 
------------------------------------------------------------------
--- VFX OPTIMIZATION / PERFORMANCE IMPROVEMENTS
------------------------------------------------------------------
 local function optimizeVFX()
-    -- Disables all VFX objects and destroys unneeded ones for best performance
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Smoke") or obj:IsA("Sparkles") or obj:IsA("Fire") then
-            ensureSaved(obj, {"Enabled"})
-            obj.Enabled = false
-        end
-        if obj:IsA("Explosion") or obj:IsA("ForceField") then
-            safeDestroy(obj)
-        end
-        -- Remove video frames/textures on parts (heavy VFX)
-        if obj:IsA("VideoFrame") then
-            safeDestroy(obj)
-        end
-        if obj:IsA("Decal") or obj:IsA("Texture") then
-            ensureSaved(obj, {"Transparency"})
-            obj.Transparency = 1
-        end
+        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Smoke") or obj:IsA("Sparkles") or obj:IsA("Fire") then ensureSaved(obj, {"Enabled"}); obj.Enabled = false end
+        if obj:IsA("Explosion") or obj:IsA("ForceField") then safeDestroy(obj) end
+        if obj:IsA("VideoFrame") then safeDestroy(obj) end
+        if obj:IsA("Decal") or obj:IsA("Texture") then ensureSaved(obj, {"Transparency"}); obj.Transparency = 1 end
     end
-    -- Remove skybox for max performance
-    for _, child in ipairs(Lighting:GetChildren()) do
-        if child:IsA("Sky") then
-            safeDestroy(child)
-        end
-    end
-    if statusLabel then statusLabel.Text = "Estado: VFX optimizados" end
+    for _, child in ipairs(Lighting:GetChildren()) do if child:IsA("Sky") then safeDestroy(child) end end
+    setStatus("Estado: VFX optimizados", Color3.fromRGB(255,200,100))
 end
 
 local function bestOptimization()
-    -- All in: Ultra++, VFX, Phys, Material, Sound, GUIs, etc.
     ultraRendimientoPlus()
     optimizeVFX()
     optimizePhysics()
@@ -165,53 +122,25 @@ local function bestOptimization()
     optimizeMaterials()
     optimizeLights()
     clearParticles()
-    if statusLabel then statusLabel.Text = "Estado: Máxima optimización" end
+    setStatus("Estado: Máxima optimización", Color3.fromRGB(255,100,100))
 end
 
 local function ultraRendimiento()
     applyProfile("Alto")
-    for _, s in ipairs(Workspace:GetDescendants()) do
-        if s:IsA("Sound") then
-            ensureSaved(s, {"Volume", "Playing"})
-            s.Volume = 0
-            s.Playing = false
-        end
-    end
-    for _, l in ipairs(Workspace:GetDescendants()) do
-        if l:IsA("Light") then
-            ensureSaved(l, {"Enabled", "Brightness", "Range"})
-            l.Enabled = false
-            l.Brightness = 0
-            l.Range = 0
-        end
-    end
-    for _, p in ipairs(Workspace:GetDescendants()) do
-        if p:IsA("ParticleEmitter") or p:IsA("Trail") or p:IsA("Beam") or p:IsA("Smoke") or p:IsA("Sparkles") or p:IsA("Fire") then
-            ensureSaved(p, {"Enabled"})
-            p.Enabled = false
-        end
-    end
+    for _, s in ipairs(Workspace:GetDescendants()) do if s:IsA("Sound") then ensureSaved(s, {"Volume", "Playing"}); s.Volume = 0; s.Playing = false end end
+    for _, l in ipairs(Workspace:GetDescendants()) do if l:IsA("Light") then ensureSaved(l, {"Enabled", "Brightness", "Range"}); l.Enabled = false; l.Brightness = 0; l.Range = 0 end end
+    for _, p in ipairs(Workspace:GetDescendants()) do if p:IsA("ParticleEmitter") or p:IsA("Trail") or p:IsA("Beam") or p:IsA("Smoke") or p:IsA("Sparkles") or p:IsA("Fire") then ensureSaved(p, {"Enabled"}); p.Enabled = false end end
     for _, part in ipairs(Workspace:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if part.Material == Enum.Material.Neon or part.Material == Enum.Material.Glass then
-                ensureSaved(part, {"Material"})
-                part.Material = Enum.Material.SmoothPlastic
-            end
-        end
-        if part:IsA("MeshPart") then
-            ensureSaved(part, {"RenderFidelity"})
-            safeSet(part, "RenderFidelity", Enum.RenderFidelity.Performance)
-        end
+        if part:IsA("BasePart") then if part.Material == Enum.Material.Neon or part.Material == Enum.Material.Glass then ensureSaved(part, {"Material"}); part.Material = Enum.Material.SmoothPlastic end end
+        if part:IsA("MeshPart") then ensureSaved(part, {"RenderFidelity"}); safeSet(part, "RenderFidelity", Enum.RenderFidelity.Performance) end
     end
-    if statusLabel then statusLabel.Text = "Estado: Ultra activado" end
+    setStatus("Estado: Ultra activado", Color3.fromRGB(255,170,255))
 end
 
 local function ultraRendimientoPlus()
     ultraRendimiento()
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("SurfaceGui") or obj:IsA("BillboardGui") or obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("VideoFrame") then
-            safeDestroy(obj)
-        end
+        if obj:IsA("SurfaceGui") or obj:IsA("BillboardGui") or obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("VideoFrame") then safeDestroy(obj) end
         if obj:IsA("MeshPart") then safeSet(obj, "RenderFidelity", Enum.RenderFidelity.Performance) end
         if obj:IsA("SpecialMesh") then safeSet(obj, "TextureId", "") end
         if obj:IsA("Script") or obj:IsA("LocalScript") then if obj.Enabled == true then obj.Enabled = false end end
@@ -224,71 +153,42 @@ local function ultraRendimientoPlus()
     Lighting.GlobalShadows = false
     Lighting.Brightness = 0.3
     Lighting.OutdoorAmbient = Color3.fromRGB(70,70,70)
-    if statusLabel then statusLabel.Text = "Estado: Ultra++ EXTREMO activado" end
+    setStatus("Estado: Ultra++ EXTREMO activado", Color3.fromRGB(180,100,255))
 end
 
 local function muteAll()
-    for _, s in ipairs(Workspace:GetDescendants()) do
-        if s:IsA("Sound") then
-            ensureSaved(s, {"Volume", "Playing"})
-            s.Volume = 0
-            s.Playing = false
-        end
-    end
+    for _, s in ipairs(Workspace:GetDescendants()) do if s:IsA("Sound") then ensureSaved(s, {"Volume", "Playing"}); s.Volume = 0; s.Playing = false end end
+    setStatus("Estado: Sonidos silenciados", Color3.fromRGB(120,255,255))
 end
 
 local function optimizeLights()
-    for _, l in ipairs(Workspace:GetDescendants()) do
-        if l:IsA("Light") then
-            ensureSaved(l, {"Enabled", "Brightness", "Range"})
-            l.Enabled = false
-            l.Brightness = 0
-            l.Range = 0
-        end
-    end
+    for _, l in ipairs(Workspace:GetDescendants()) do if l:IsA("Light") then ensureSaved(l, {"Enabled", "Brightness", "Range"}); l.Enabled = false; l.Brightness = 0; l.Range = 0 end end
+    setStatus("Estado: Luces optimizadas", Color3.fromRGB(200,255,180))
 end
 
 local function clearParticles()
-    for _, p in ipairs(Workspace:GetDescendants()) do
-        if p:IsA("ParticleEmitter") or p:IsA("Trail") or p:IsA("Beam") or p:IsA("Smoke") or p:IsA("Sparkles") or p:IsA("Fire") then
-            ensureSaved(p, {"Enabled"})
-            p.Enabled = false
-        end
-    end
+    for _, p in ipairs(Workspace:GetDescendants()) do if p:IsA("ParticleEmitter") or p:IsA("Trail") or p:IsA("Beam") or p:IsA("Smoke") or p:IsA("Sparkles") or p:IsA("Fire") then ensureSaved(p, {"Enabled"}); p.Enabled = false end end
+    setStatus("Estado: Partículas apagadas", Color3.fromRGB(200,180,255))
 end
 
 local function hideDecorGUIs()
-    for g, _ in pairs(baseline.Guis) do
-        if g and g ~= guiMain then
-            ensureSaved(g, {"Enabled"})
-            g.Enabled = false
-        end
-    end
+    for g, _ in pairs(baseline.Guis) do if g and g ~= guiMain then ensureSaved(g, {"Enabled"}); g.Enabled = false end end
+    setStatus("Estado: GUIs decorativos ocultos", Color3.fromRGB(220,220,180))
 end
 
 local function optimizeMaterials()
     for _, part in ipairs(Workspace:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if part.Material == Enum.Material.Neon or part.Material == Enum.Material.Glass then
-                ensureSaved(part, {"Material"})
-                part.Material = Enum.Material.SmoothPlastic
-            end
-        end
-        if part:IsA("MeshPart") then
-            ensureSaved(part, {"RenderFidelity"})
-            pcall(function() part.RenderFidelity = Enum.RenderFidelity.Performance end)
-        end
+        if part:IsA("BasePart") then if part.Material == Enum.Material.Neon or part.Material == Enum.Material.Glass then ensureSaved(part, {"Material"}); part.Material = Enum.Material.SmoothPlastic end end
+        if part:IsA("MeshPart") then ensureSaved(part, {"RenderFidelity"}); pcall(function() part.RenderFidelity = Enum.RenderFidelity.Performance end) end
     end
+    setStatus("Estado: Materiales optimizados", Color3.fromRGB(180,255,200))
 end
 
 local function optimizePhysics()
     for _, part in ipairs(Workspace:GetDescendants()) do
-        if part:IsA("BasePart") then
-            ensureSaved(part, {"Anchored", "CanCollide"})
-            part.Anchored = true
-            part.CanCollide = false
-        end
+        if part:IsA("BasePart") then ensureSaved(part, {"Anchored", "CanCollide"}); part.Anchored = true; part.CanCollide = false end
     end
+    setStatus("Estado: Físicas optimizadas", Color3.fromRGB(255,180,180))
 end
 
 local function toggleBlack()
@@ -301,6 +201,7 @@ local function toggleBlack()
         blackFrame.Parent = guiMain
     end
     blackFrame.Visible = not blackFrame.Visible
+    setStatus(blackFrame.Visible and "Pantalla negra ON" or "Pantalla negra OFF", Color3.fromRGB(120,120,120))
 end
 
 -- ========== GUI principal y mejoras ==========
@@ -330,6 +231,7 @@ frame.BorderSizePixel = 0
 frame.Active = true
 frame.ZIndex = 1
 frame.Parent = guiMain
+frame.BackgroundTransparency = 1 -- Para la animación de aparición
 local frameCorner = Instance.new("UICorner", frame)
 frameCorner.CornerRadius = UDim.new(0.07, 6)
 local gradient = Instance.new("UIGradient", frame)
@@ -365,6 +267,9 @@ closeBtn.Parent = frame
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0.07, 6)
 closeBtn.MouseButton1Click:Connect(function()
     panelVisible = false
+    TweenService:Create(frame, TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
+    TweenService:Create(shadow, TweenInfo.new(0.18), {ImageTransparency = 1}):Play()
+    task.wait(0.20)
     frame.Visible = false
     shadow.Visible = false
     openBtn.Visible = true
@@ -387,6 +292,8 @@ openBtn.MouseButton1Click:Connect(function()
     frame.Visible = true
     shadow.Visible = true
     openBtn.Visible = false
+    TweenService:Create(shadow, TweenInfo.new(0.16), {ImageTransparency = 0.35}):Play()
+    TweenService:Create(frame, TweenInfo.new(0.24, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
 end)
 
 handle = Instance.new("Frame")
@@ -479,13 +386,10 @@ local tabs = {
         {Text = "🌑 Pantalla negra ON/OFF", Callback = toggleBlack}
     },
     ["🧩 Perfiles"] = {
-        {Text = "⏬ Bajo", Callback = function() applyProfile("Bajo") end},
-        {Text = "⏸ Medio", Callback = function() applyProfile("Medio") end},
-        {Text = "⏫ Alto", Callback = function() applyProfile("Alto") end},
-        {Text = "⚡ Auto", Callback = function()
-            autoMode = not autoMode
-            statusLabel.Text = "Estado: Perfil Auto " .. (autoMode and "ON" or "OFF")
-        end}
+        {Text = "⏬ Bajo", Callback = function(btn) applyProfile("Bajo") end},
+        {Text = "⏸ Medio", Callback = function(btn) applyProfile("Medio") end},
+        {Text = "⏫ Alto", Callback = function(btn) applyProfile("Alto") end},
+        {Text = "⚡ Auto", Callback = function(btn) autoMode = not autoMode; setStatus("Estado: Perfil Auto "..(autoMode and "ON" or "OFF"), Color3.fromRGB(200,200,200)) end}
     },
     ["⚙️ Acciones"] = {
         {Text = "🔇 Silenciar sonidos", Callback = muteAll},
@@ -501,9 +405,7 @@ local tabs = {
     }
 }
 
-local tabY = 100
-local tabHeight = 48
-local tabSpacing = 12
+local tabY, tabHeight, tabSpacing = 100, 48, 12
 
 local tabsBar = Instance.new("ScrollingFrame")
 tabsBar.Size = UDim2.new(1, -24, 0, tabHeight)
@@ -523,9 +425,7 @@ tabsList.Padding = UDim.new(0, tabSpacing)
 tabsList.SortOrder = Enum.SortOrder.LayoutOrder
 tabsList.Parent = tabsBar
 
-tabButtons = {}
-tabContents = {}
-contentFrames = {}
+tabButtons, tabContents, contentFrames = {}, {}, {}
 
 local contentArea = Instance.new("Frame")
 contentArea.Size = UDim2.new(1, 0, 1, -(tabY + tabHeight + 44))
@@ -548,8 +448,7 @@ for tabName, actions in pairs(tabs) do
     tabBtn.AutoButtonColor = true
     tabBtn.BorderSizePixel = 0
     tabBtn.ZIndex = 10
-    local corner = Instance.new("UICorner", tabBtn)
-    corner.CornerRadius = UDim.new(0.07, 6)
+    Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0.07, 6)
     local grad = Instance.new("UIGradient", tabBtn)
     grad.Color = ColorSequence.new{
         ColorSequenceKeypoint.new(0, Color3.fromRGB(42, 50, 130)),
@@ -559,12 +458,12 @@ for tabName, actions in pairs(tabs) do
     grad.Rotation = 90
     tabBtn.MouseEnter:Connect(function()
         if tabBtn.BackgroundColor3 ~= Color3.fromRGB(180, 100, 255) then
-            TweenService:Create(tabBtn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(80, 90, 210)}):Play()
+            TweenService:Create(tabBtn, TweenInfo.new(0.14), {BackgroundColor3 = Color3.fromRGB(80, 90, 210)}):Play()
         end
     end)
     tabBtn.MouseLeave:Connect(function()
         if tabBtn.BackgroundColor3 ~= Color3.fromRGB(180, 100, 255) then
-            TweenService:Create(tabBtn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(42, 50, 130)}):Play()
+            TweenService:Create(tabBtn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(42, 50, 130)}):Play()
         end
     end)
     table.insert(tabButtons, tabBtn)
@@ -603,16 +502,22 @@ for tabName, actions in pairs(tabs) do
         }
         btnGrad.Rotation = 70
         btn.MouseEnter:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(120, 60, 170)}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.11), {BackgroundColor3 = Color3.fromRGB(120, 60, 170)}):Play()
         end)
         btn.MouseLeave:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(38, 22, 80)}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.13), {BackgroundColor3 = Color3.fromRGB(38, 22, 80)}):Play()
         end)
         btn.MouseButton1Click:Connect(function()
+            btn.AutoButtonColor = false
+            TweenService:Create(btn, TweenInfo.new(0.16), {BackgroundColor3 = Color3.fromRGB(255,255,160)}):Play()
             local ok, err = pcall(function() action.Callback(btn) end)
             if not ok then
-                warn("[TurboOptimizer] Error en botón:", err)
+                setStatus("Error: "..tostring(err), Color3.fromRGB(255,60,60))
+            else
+                TweenService:Create(btn, TweenInfo.new(0.16), {BackgroundColor3 = Color3.fromRGB(38, 22, 80)}):Play()
             end
+            task.wait(0.18)
+            btn.AutoButtonColor = true
         end)
         table.insert(tabContents[tabName], btn)
     end
@@ -626,13 +531,11 @@ tabsBar.CanvasSize = UDim2.new(0, tabsList.AbsoluteContentSize.X, 1, 0)
 
 local activeTab = nil
 local function showTab(tabName)
-    for name, frameObj in pairs(contentFrames) do
-        frameObj.Visible = (name == tabName)
-    end
+    for name, frameObj in pairs(contentFrames) do frameObj.Visible = (name == tabName) end
     activeTab = tabName
     for _, btn in ipairs(tabButtons) do
         if btn.Text == tabName then
-            TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(180, 100, 255)}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(180, 100, 255)}):Play()
             btn.TextColor3 = Color3.fromRGB(255,255,255)
         else
             TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(42, 50, 130)}):Play()
@@ -640,21 +543,15 @@ local function showTab(tabName)
         end
     end
 end
-
-for i, btn in ipairs(tabButtons) do
-    btn.MouseButton1Click:Connect(function()
-        showTab(btn.Text)
-    end)
-end
+for i, btn in ipairs(tabButtons) do btn.MouseButton1Click:Connect(function() showTab(btn.Text) end) end
 showTab(tabButtons[1].Text)
 
--- Resize/arrastre/contadores adaptativos
+-- Resize/arrastre/contadores adaptativos (sin mover frame.Position)
 handle.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         resizing = true
         local startMouse = UserInputService:GetMouseLocation()
         local startSize = frame.Size
-        local startPos = frame.Position
         local con; con = UserInputService.InputChanged:Connect(function(inp)
             if resizing and inp.UserInputType == Enum.UserInputType.MouseMovement then
                 local mouse = UserInputService:GetMouseLocation()
@@ -681,10 +578,7 @@ handle.InputBegan:Connect(function(input)
             end
         end)
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                resizing = false
-                if con then con:Disconnect() end
-            end
+            if input.UserInputState == Enum.UserInputState.End then resizing = false; if con then con:Disconnect() end end
         end)
     end
 end)
@@ -732,10 +626,7 @@ UserInputService.InputChanged:Connect(function(input)
     if dragging then
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             local delta = input.Position - dragStart
-            openBtn.Position = UDim2.fromOffset(
-                startPos.X.Offset + delta.X,
-                startPos.Y.Offset + delta.Y
-            )
+            openBtn.Position = UDim2.fromOffset(startPos.X.Offset + delta.X, startPos.Y.Offset + delta.Y)
         end
     end
 end)
@@ -744,36 +635,19 @@ end)
 RunService.RenderStepped:Connect(function(dt)
     fpsNow = math.round(1/dt)
     local nowTime = tick()
-
-    -- Limpiar buffer viejo (más de 10s atrás)
     table.insert(fpsBuffer, {t=nowTime, v=fpsNow})
     local i = 1
     while i <= #fpsBuffer do
-        if nowTime - fpsBuffer[i].t > fpsBufferMaxTime then
-            table.remove(fpsBuffer, i)
-        else
-            i = i + 1
-        end
+        if nowTime - fpsBuffer[i].t > fpsBufferMaxTime then table.remove(fpsBuffer, i) else i = i + 1 end
     end
-    -- FPS promedio últimos 10s
     local avg10 = 0
-    if #fpsBuffer > 0 then
-        local sum = 0
-        for _, v in ipairs(fpsBuffer) do sum = sum + v.v end
-        avg10 = math.floor(sum / #fpsBuffer)
-    end
-
+    if #fpsBuffer > 0 then local sum = 0; for _, v in ipairs(fpsBuffer) do sum = sum + v.v end avg10 = math.floor(sum / #fpsBuffer) end
     fpsMin = math.min(fpsMin, fpsNow)
     fpsMax = math.max(fpsMax, fpsNow)
     local netPing = 0
     if Stats then
         local netStats = Stats:FindFirstChild("PerformanceStats")
-        if netStats then
-            local p = netStats:FindFirstChild("Ping")
-            if p and p:GetAttribute("Value") then
-                netPing = math.floor(p:GetAttribute("Value"))
-            end
-        end
+        if netStats then local p = netStats:FindFirstChild("Ping"); if p and p:GetAttribute("Value") then netPing = math.floor(p:GetAttribute("Value")) end end
     end
     pingNow = netPing
     fpsLabel.Text = "FPS: " .. fpsNow
@@ -787,21 +661,18 @@ end)
 
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if input.KeyCode == Enum.KeyCode.U then
-        ultraRendimiento()
-    elseif input.KeyCode == Enum.KeyCode.P then
-        ultraRendimientoPlus()
-    elseif input.KeyCode == Enum.KeyCode.V then
-        optimizeVFX()
-    elseif input.KeyCode == Enum.KeyCode.O then
-        bestOptimization()
-    elseif input.KeyCode == Enum.KeyCode.R then
-        restoreAll()
-    elseif input.KeyCode == Enum.KeyCode.N or input.KeyCode == Enum.KeyCode.B then
-        toggleBlack()
+    if input.KeyCode == Enum.KeyCode.U then ultraRendimiento()
+    elseif input.KeyCode == Enum.KeyCode.P then ultraRendimientoPlus()
+    elseif input.KeyCode == Enum.KeyCode.V then optimizeVFX()
+    elseif input.KeyCode == Enum.KeyCode.O then bestOptimization()
+    elseif input.KeyCode == Enum.KeyCode.R then restoreAll()
+    elseif input.KeyCode == Enum.KeyCode.N or input.KeyCode == Enum.KeyCode.B then toggleBlack()
     elseif input.KeyCode == Enum.KeyCode.F1 then
         if panelVisible then
             panelVisible = false
+            TweenService:Create(frame, TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
+            TweenService:Create(shadow, TweenInfo.new(0.18), {ImageTransparency = 1}):Play()
+            task.wait(0.20)
             frame.Visible = false
             shadow.Visible = false
             openBtn.Visible = true
@@ -810,10 +681,21 @@ UserInputService.InputBegan:Connect(function(input, gp)
             frame.Visible = true
             shadow.Visible = true
             openBtn.Visible = false
+            TweenService:Create(shadow, TweenInfo.new(0.16), {ImageTransparency = 0.35}):Play()
+            TweenService:Create(frame, TweenInfo.new(0.23, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
         end
     end
 end)
 
+-- Animación inicial de aparición
+frame.Visible = true
+shadow.Visible = true
+frame.BackgroundTransparency = 1
+shadow.ImageTransparency = 1
+TweenService:Create(shadow, TweenInfo.new(0.30, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {ImageTransparency = 0.35}):Play()
+TweenService:Create(frame, TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+panelVisible = true
+
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Mejorado: VFX, Máxima optimización, GUI mejorado, FPS avg últimos 10s, contadores adaptados, bugs corregidos.")
+print("[TurboOptimizer] Optimizado: animación, feedback, resize fijo, robustez, estados claros, sugerencias aplicadas.")
