@@ -1,4 +1,5 @@
 -- TURBO OPTIMIZER PANEL - Ultra y Ultra++ por separado, contadores adaptativos al ancho del GUI y FPS promedio últimos 10s
+-- Mejoras: VFX Optimizations, Performance improvements, Best Optimization, GUI bug fixes, General GUI improvements
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -29,7 +30,6 @@ local panelVisible = true
 local fpsNow = 60
 local fpsBuffer = {}
 local fpsBufferMaxTime = 10  -- segundos
-local fpsBufferStartTime = tick()
 local fpsMin, fpsMax = 60, 60
 local pingNow = 0
 
@@ -38,7 +38,19 @@ local statusLabel, shortcutLabel, frame, shadow, openBtn, closeBtn, handle
 local countersFrame
 local tabButtons, tabContents, contentFrames = {}, {}, {}
 
--- -------- OPTIMIZACIONES --------
+-- --------- UTILITIES ----------
+local function safeSet(obj, prop, val)
+    if obj and obj[prop] ~= nil then
+        pcall(function() obj[prop] = val end)
+    end
+end
+
+local function safeDestroy(obj)
+    if obj and obj.Destroy then
+        pcall(function() obj:Destroy() end)
+    end
+end
+
 local function ensureSaved(obj, props)
     if not obj then return end
     baseline.Props[obj] = baseline.Props[obj] or {}
@@ -112,6 +124,50 @@ local function applyProfile(name)
     if statusLabel then statusLabel.Text = ("Estado: Perfil %s%s"):format(name, autoMode and " (Auto)" or "") end
 end
 
+-----------------------------------------------------------------
+-- VFX OPTIMIZATION / PERFORMANCE IMPROVEMENTS
+-----------------------------------------------------------------
+local function optimizeVFX()
+    -- Disables all VFX objects and destroys unneeded ones for best performance
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Smoke") or obj:IsA("Sparkles") or obj:IsA("Fire") then
+            ensureSaved(obj, {"Enabled"})
+            obj.Enabled = false
+        end
+        if obj:IsA("Explosion") or obj:IsA("ForceField") then
+            safeDestroy(obj)
+        end
+        -- Remove video frames/textures on parts (heavy VFX)
+        if obj:IsA("VideoFrame") then
+            safeDestroy(obj)
+        end
+        if obj:IsA("Decal") or obj:IsA("Texture") then
+            ensureSaved(obj, {"Transparency"})
+            obj.Transparency = 1
+        end
+    end
+    -- Remove skybox for max performance
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("Sky") then
+            safeDestroy(child)
+        end
+    end
+    if statusLabel then statusLabel.Text = "Estado: VFX optimizados" end
+end
+
+local function bestOptimization()
+    -- All in: Ultra++, VFX, Phys, Material, Sound, GUIs, etc.
+    ultraRendimientoPlus()
+    optimizeVFX()
+    optimizePhysics()
+    muteAll()
+    hideDecorGUIs()
+    optimizeMaterials()
+    optimizeLights()
+    clearParticles()
+    if statusLabel then statusLabel.Text = "Estado: Máxima optimización" end
+end
+
 local function ultraRendimiento()
     applyProfile("Alto")
     for _, s in ipairs(Workspace:GetDescendants()) do
@@ -144,7 +200,7 @@ local function ultraRendimiento()
         end
         if part:IsA("MeshPart") then
             ensureSaved(part, {"RenderFidelity"})
-            pcall(function() part.RenderFidelity = Enum.RenderFidelity.Performance end)
+            safeSet(part, "RenderFidelity", Enum.RenderFidelity.Performance)
         end
     end
     if statusLabel then statusLabel.Text = "Estado: Ultra activado" end
@@ -154,15 +210,15 @@ local function ultraRendimientoPlus()
     ultraRendimiento()
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("SurfaceGui") or obj:IsA("BillboardGui") or obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("VideoFrame") then
-            obj:Destroy()
+            safeDestroy(obj)
         end
-        if obj:IsA("MeshPart") then obj.RenderFidelity = Enum.RenderFidelity.Performance end
-        if obj:IsA("SpecialMesh") then obj.TextureId = "" end
+        if obj:IsA("MeshPart") then safeSet(obj, "RenderFidelity", Enum.RenderFidelity.Performance) end
+        if obj:IsA("SpecialMesh") then safeSet(obj, "TextureId", "") end
         if obj:IsA("Script") or obj:IsA("LocalScript") then if obj.Enabled == true then obj.Enabled = false end end
         if obj:IsA("Humanoid") then for _, track in ipairs(obj:GetPlayingAnimationTracks()) do track:Stop() end end
         if obj:IsA("Sound") and obj.Looped then obj:Stop(); obj.Volume = 0 end
     end
-    for _, child in ipairs(Lighting:GetChildren()) do if child:IsA("Sky") then child:Destroy() end end
+    for _, child in ipairs(Lighting:GetChildren()) do if child:IsA("Sky") then safeDestroy(child) end end
     local sky = Instance.new("Sky"); sky.Parent = Lighting
     Lighting.Technology = Enum.Technology.Compatibility
     Lighting.GlobalShadows = false
@@ -247,7 +303,7 @@ local function toggleBlack()
     blackFrame.Visible = not blackFrame.Visible
 end
 
--- GUI principal y sombra difuminada
+-- ========== GUI principal y mejoras ==========
 guiMain = Instance.new("ScreenGui")
 guiMain.Name = "TurboPanel"
 guiMain.ResetOnSpawn = false
@@ -398,7 +454,7 @@ shortcutLabel = Instance.new("TextLabel")
 shortcutLabel.Size = UDim2.new(1, -20, 0, 20)
 shortcutLabel.Position = UDim2.fromOffset(10, frame.Size.Y.Offset - 28)
 shortcutLabel.BackgroundTransparency = 1
-shortcutLabel.Text = "Atajos: U=Ultra | P=Ultra++ | R=Restaurar | N/B=Negro | F1=Panel | Panel arrastrable/esquina"
+shortcutLabel.Text = "Atajos: U=Ultra | P=Ultra++ | V=VFX | O=Best | R=Restaurar | N/B=Negro | F1=Panel | Arrastrar/Esquina"
 shortcutLabel.TextScaled = true
 shortcutLabel.Font = Enum.Font.Gotham
 shortcutLabel.TextColor3 = Color3.fromRGB(170, 140, 255)
@@ -439,7 +495,9 @@ local tabs = {
         {Text = "🧱 Optimizar materiales", Callback = optimizeMaterials},
         {Text = "🛠 Optimizar físicas", Callback = optimizePhysics},
         {Text = "🚀 Ultra", Callback = ultraRendimiento},
-        {Text = "🔥 Ultra++", Callback = ultraRendimientoPlus}
+        {Text = "🔥 Ultra++", Callback = ultraRendimientoPlus},
+        {Text = "✨ Optimizar VFX", Callback = optimizeVFX},
+        {Text = "🏆 Máxima optimización", Callback = bestOptimization}
     }
 }
 
@@ -733,6 +791,10 @@ UserInputService.InputBegan:Connect(function(input, gp)
         ultraRendimiento()
     elseif input.KeyCode == Enum.KeyCode.P then
         ultraRendimientoPlus()
+    elseif input.KeyCode == Enum.KeyCode.V then
+        optimizeVFX()
+    elseif input.KeyCode == Enum.KeyCode.O then
+        bestOptimization()
     elseif input.KeyCode == Enum.KeyCode.R then
         restoreAll()
     elseif input.KeyCode == Enum.KeyCode.N or input.KeyCode == Enum.KeyCode.B then
@@ -754,4 +816,4 @@ end)
 
 snapshotAll()
 statusLabel.Text = "Estado: Inactivo — elige un perfil"
-print("[TurboOptimizer] Panel Ultra y Ultra++ adaptativo. FPS avg últimos 10s. Ping y contadores ajustados. Contadores nunca se salen del GUI.")
+print("[TurboOptimizer] Mejorado: VFX, Máxima optimización, GUI mejorado, FPS avg últimos 10s, contadores adaptados, bugs corregidos.")
